@@ -1,0 +1,359 @@
+// The skill curriculum: ordered levels that gate which Vim motions each drill
+// emphasizes. Cursor Rush levels drive the MVP; more modes plug in later.
+
+export type TargetKind = "anyChar" | "wordStart" | "lineStart" | "findChar";
+
+export interface CursorRushLevel {
+  id: string;
+  title: string;
+  skill: string; // human label for the tier
+  hint: string; // one-line teaching tip shown in the HUD
+  buffer: string[];
+  targetCount: number;
+  timeLimit: number; // seconds
+  targetKind: TargetKind;
+  minDistance: number; // targets spawn at least this Manhattan distance away
+}
+
+const PROSE = [
+  "the quick brown fox jumps over the lazy dog",
+  "pack my box with five dozen liquor jugs",
+  "how vexingly quick daft zebras jump today",
+  "the five boxing wizards jump very quickly",
+  "sphinx of black quartz judge my vow now",
+];
+
+const CODE = [
+  "function greet(name) {",
+  "  const msg = 'hello, ' + name;",
+  "  console.log(msg);",
+  "  return msg.length;",
+  "}",
+  "",
+  "const users = [alice, bob, carol];",
+  "users.forEach((u) => greet(u));",
+];
+
+const GRID = [
+  "· · · · · · · · · · · · · · ·",
+  "· x · · · o · · · x · · · o ·",
+  "· · · · · · · · · · · · · · ·",
+  "· o · · x · · · o · · · x · ·",
+  "· · · · · · · · · · · · · · ·",
+  "· x · · · o · · · x · · · o ·",
+];
+
+export const CURSOR_RUSH_LEVELS: CursorRushLevel[] = [
+  {
+    id: "rush-hjkl",
+    title: "hjkl Bootcamp",
+    skill: "Basic motion",
+    hint: "Move with h ← j ↓ k ↑ l →. Reach the highlighted cell.",
+    buffer: GRID,
+    targetCount: 10,
+    timeLimit: 45,
+    targetKind: "anyChar",
+    minDistance: 3,
+  },
+  {
+    id: "rush-words",
+    title: "Word Sprint",
+    skill: "Word motion",
+    hint: "Use w / b / e to leap word-by-word instead of spamming l.",
+    buffer: PROSE,
+    targetCount: 12,
+    timeLimit: 45,
+    targetKind: "wordStart",
+    minDistance: 5,
+  },
+  {
+    id: "rush-find",
+    title: "Find & Strike",
+    skill: "Find on line",
+    hint: "f{char} jumps to a character; t stops just before it; ; repeats.",
+    buffer: PROSE,
+    targetCount: 12,
+    timeLimit: 45,
+    targetKind: "findChar",
+    minDistance: 6,
+  },
+  {
+    id: "rush-search",
+    title: "Search Party",
+    skill: "Search (/ n)",
+    hint: "Type /word then Enter to fly to it; n repeats. Way faster than stepping.",
+    buffer: PROSE,
+    targetCount: 12,
+    timeLimit: 50,
+    targetKind: "wordStart",
+    minDistance: 10,
+  },
+  {
+    id: "rush-lines",
+    title: "Line Leaper",
+    skill: "Screen / file motion",
+    hint: "gg to top, G to bottom, or 5G to jump to a line. Counts save keys!",
+    buffer: CODE,
+    targetCount: 10,
+    timeLimit: 50,
+    targetKind: "lineStart",
+    minDistance: 3,
+  },
+  {
+    id: "rush-mixed",
+    title: "Grand Rush",
+    skill: "Everything",
+    hint: "Mix motions freely — the fewer keys per target, the bigger the combo.",
+    buffer: CODE,
+    targetCount: 15,
+    timeLimit: 60,
+    targetKind: "anyChar",
+    minDistance: 5,
+  },
+];
+
+export function getLevel(id: string): CursorRushLevel | undefined {
+  return CURSOR_RUSH_LEVELS.find((l) => l.id === id);
+}
+
+// --- Dodge mode ------------------------------------------------------------
+
+export interface DodgeLevel {
+  id: string;
+  title: string;
+  skill: string;
+  hint: string;
+  duration: number; // seconds of escalating waves to survive
+  startHp: number;
+  /** Difficulty knobs, scaled from 0 (start) to 1 (end of level). */
+  baseSpawnInterval: number; // seconds between spawns at difficulty 0
+  minSpawnInterval: number; // seconds between spawns at difficulty 1
+  baseSpeed: number; // projectile cells/sec at difficulty 0
+  maxSpeed: number; // projectile cells/sec at difficulty 1
+  patterns: DodgePattern[];
+  /**
+   * Extra simultaneous waves at difficulty 1 (0 = one pattern per spawn tick).
+   * Ramps in with difficulty, so late-game gets denser. Defaults to 0.
+   */
+  intensity?: number;
+}
+
+export type DodgePattern =
+  | "stream" // horizontal line of bullets from left/right
+  | "rain" // vertical drop from the top
+  | "aimed" // single shot from any edge, straight at the cursor
+  | "wall" // full column with one gap — forces a big jump
+  | "diagonal" // stream angled in from a corner
+  | "arc" // a fan of bullets from an edge, spread around the cursor
+  | "ring" // omnidirectional burst from an interior point
+  | "spiral"; // rotating emitter that sweeps bullets in every direction
+
+export const DODGE_LEVELS: DodgeLevel[] = [
+  {
+    id: "dodge-basics",
+    title: "First Contact",
+    skill: "Basic motion under pressure",
+    hint: "Dodge with h j k l. Stay calm — read the lanes.",
+    duration: 40,
+    startHp: 3,
+    baseSpawnInterval: 1.1,
+    minSpawnInterval: 0.55,
+    baseSpeed: 7,
+    maxSpeed: 12,
+    patterns: ["stream", "rain"],
+  },
+  {
+    id: "dodge-aimed",
+    title: "Aimbot Alley",
+    skill: "Reposition fast",
+    hint: "Bullets aim where you ARE, from every side. Keep moving — w/b/$ cover ground fast.",
+    duration: 50,
+    startHp: 3,
+    baseSpawnInterval: 1.0,
+    minSpawnInterval: 0.42,
+    baseSpeed: 8,
+    maxSpeed: 15,
+    patterns: ["stream", "rain", "aimed", "diagonal"],
+    intensity: 1,
+  },
+  {
+    id: "dodge-walls",
+    title: "Wall Run",
+    skill: "Big jumps: gg G $ 0",
+    hint: "Walls have ONE gap. Snap to it with gg / G / $ / 0 — hjkl is too slow.",
+    duration: 55,
+    startHp: 4,
+    baseSpawnInterval: 1.25,
+    minSpawnInterval: 0.62,
+    baseSpeed: 6,
+    maxSpeed: 12,
+    patterns: ["wall", "aimed", "rain", "arc"],
+    intensity: 1,
+  },
+  {
+    id: "dodge-crossfire",
+    title: "Crossfire",
+    skill: "Read angles from all sides",
+    hint: "Fire pours in at every angle. Watch the diagonals — h/j/k/l alone won't cut it.",
+    duration: 55,
+    startHp: 4,
+    baseSpawnInterval: 1.0,
+    minSpawnInterval: 0.4,
+    baseSpeed: 8,
+    maxSpeed: 16,
+    patterns: ["diagonal", "aimed", "arc", "stream", "rain"],
+    intensity: 2,
+  },
+  {
+    id: "dodge-vortex",
+    title: "Vortex",
+    skill: "Thread rotating fire",
+    hint: "Rings and spirals bloom outward. Find the gaps in the rotation and slip through.",
+    duration: 60,
+    startHp: 4,
+    baseSpawnInterval: 1.15,
+    minSpawnInterval: 0.5,
+    baseSpeed: 7,
+    maxSpeed: 14,
+    patterns: ["ring", "spiral", "aimed", "arc"],
+    intensity: 2,
+  },
+  {
+    id: "dodge-storm",
+    title: "Bullet Storm",
+    skill: "Everything",
+    hint: "Every pattern, every angle, no mercy. Use every motion you know.",
+    duration: 65,
+    startHp: 5,
+    baseSpawnInterval: 0.85,
+    minSpawnInterval: 0.34,
+    baseSpeed: 8,
+    maxSpeed: 18,
+    patterns: ["stream", "rain", "aimed", "wall", "diagonal", "arc", "ring", "spiral"],
+    intensity: 3,
+  },
+];
+
+export function getDodgeLevel(id: string): DodgeLevel | undefined {
+  return DODGE_LEVELS.find((l) => l.id === id);
+}
+
+// --- Golf mode -------------------------------------------------------------
+
+export interface GolfPuzzle {
+  id: string;
+  title: string;
+  skill: string;
+  hint: string;
+  start: string[];
+  target: string[];
+  par: number; // keystroke par (Esc counts, like real vimgolf)
+  startCursor?: { row: number; col: number };
+}
+
+export const GOLF_PUZZLES: GolfPuzzle[] = [
+  {
+    id: "golf-delete-line",
+    title: "Tidy Up",
+    skill: "Line delete (dd)",
+    hint: "Remove the debug line. Think dd.",
+    start: ["const x = 1;", "console.log('debug');", "const y = 2;"],
+    target: ["const x = 1;", "const y = 2;"],
+    par: 3,
+    startCursor: { row: 1, col: 0 },
+  },
+  {
+    id: "golf-swap-word",
+    title: "Rename",
+    skill: "Change word (ciw / cw)",
+    hint: "Turn foo into bar. ciw is your friend.",
+    start: ["let foo = 42;"],
+    target: ["let bar = 42;"],
+    par: 8,
+    startCursor: { row: 0, col: 4 },
+  },
+  {
+    id: "golf-quote",
+    title: "Quote It",
+    skill: "Change inside quotes (ci\")",
+    hint: 'Replace the placeholder text between the quotes with hello.',
+    start: ['msg = "xxxxx";'],
+    target: ['msg = "hello";'],
+    par: 9,
+    startCursor: { row: 0, col: 7 },
+  },
+  {
+    id: "golf-args",
+    title: "Swap the Guts",
+    skill: "Change inside parens (ci()",
+    hint: "Change the args inside ( ) to a, b. Try ci(.",
+    start: ["call(1, 2, 3)"],
+    target: ["call(a, b)"],
+    par: 8,
+    startCursor: { row: 0, col: 5 },
+  },
+  {
+    id: "golf-append",
+    title: "Semicolons",
+    skill: "Append at end (A)",
+    hint: "Add a semicolon to each line. A;<Esc> then j. and repeat, or . to repeat.",
+    start: ["let a = 1", "let b = 2", "let c = 3"],
+    target: ["let a = 1;", "let b = 2;", "let c = 3;"],
+    par: 12,
+    startCursor: { row: 0, col: 0 },
+  },
+  {
+    id: "golf-reverse",
+    title: "Flip Order",
+    skill: "Delete + paste (dd p)",
+    hint: "Move the first line below the second. dd then p.",
+    start: ["second", "first"],
+    target: ["first", "second"],
+    par: 3,
+    startCursor: { row: 0, col: 0 },
+  },
+  {
+    id: "golf-empty-call",
+    title: "Empty the Call",
+    skill: "Delete inside parens (di()",
+    hint: "Clear everything between the parentheses. di( does it in one move.",
+    start: ["render(a, b, c)"],
+    target: ["render()"],
+    par: 4,
+    startCursor: { row: 0, col: 7 },
+  },
+  {
+    id: "golf-dup",
+    title: "Twins",
+    skill: "Yank + paste line (yy p)",
+    hint: "Make a second, identical line. Yank it with yy, paste with p.",
+    start: ["clone"],
+    target: ["clone", "clone"],
+    par: 3,
+    startCursor: { row: 0, col: 0 },
+  },
+  {
+    id: "golf-substitute",
+    title: "Find & Replace",
+    skill: "Substitute (:s//g)",
+    hint: "Replace every 'a' with 'b' at once. :s/a/b/g beats doing it by hand.",
+    start: ["a a a a a"],
+    target: ["b b b b b"],
+    par: 10,
+    startCursor: { row: 0, col: 0 },
+  },
+  {
+    id: "golf-block-strip",
+    title: "Strip the Column",
+    skill: "Visual block (Ctrl-V)",
+    hint: "Delete the leading '# ' from every line with a visual block: Ctrl-V, select, d.",
+    start: ["# alpha", "# beta", "# gamma"],
+    target: ["alpha", "beta", "gamma"],
+    par: 6,
+    startCursor: { row: 0, col: 0 },
+  },
+];
+
+export function getGolfPuzzle(id: string): GolfPuzzle | undefined {
+  return GOLF_PUZZLES.find((p) => p.id === id);
+}
