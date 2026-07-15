@@ -55,6 +55,15 @@ Drop MP3s at `public/music/menu.mp3` (ambient menu loop) and
 automatically — crossfading between them as you enter/leave runs. No files, no
 music, no errors. Music volume has its own dial in settings.
 
+## Online leaderboards
+
+After a run, press `s` to submit your score under 3-letter arcade initials, or
+`l` to view the top 10 for that level (Golf boards rank by fewest keys).
+Scores live in Cloud Firestore, accessed directly over its REST API — no SDK,
+no backend server. Security rules make boards read-only and append-only with
+strict validation (`firestore.rules`); nothing can be edited or deleted from
+the client. If the network is down the game plays on — leaderboards fail soft.
+
 ## Settings
 
 On the menu, choose **SETTINGS**: volume, a **CRT bloom** dial (Vectrex-style

@@ -7,6 +7,7 @@ import { Storage } from "./core/storage.ts";
 import { unlockNext } from "./core/progression.ts";
 import { KeyRemapper } from "./core/keybinds.ts";
 import { MusicPlayer } from "./core/music.ts";
+import { fetchTop, initialsChar, submitScore, type BoardEntry } from "./core/leaderboard.ts";
 import { TerminalRenderer } from "./render/terminal.ts";
 import { AMBER_PHOSPHOR, GREEN_PHOSPHOR, scaledMetrics } from "./render/theme.ts";
 import { ScreenShake } from "./juice/shake.ts";
@@ -55,6 +56,18 @@ let result: ModeResult | null = null;
 let lastLevelIds: string[] = [];
 let lastLevelId = "";
 
+// Result-screen sub-state: summary -> (initials entry -> ) leaderboard.
+type ResultPhase =
+  | { kind: "summary" }
+  | { kind: "initials"; slots: string; sending: boolean }
+  | { kind: "board"; entries: BoardEntry[] | null; loading: boolean; note?: string };
+let resultPhase: ResultPhase = { kind: "summary" };
+let resultSubmitted = ""; // initials this run was submitted under ("" = not yet)
+
+function canSubmit(r: ModeResult): boolean {
+  return r.score > 0 && !r.levelId.startsWith("tut-");
+}
+
 // --- sizing ---
 // Cap the board to a fixed design size so it stays a tidy rectangle centered by
 // the flex container (#app), instead of stretching to fill the whole window and
@@ -91,9 +104,59 @@ function dispatch(token: KeyToken): void {
       return;
     }
     mode?.handleKey(token);
-  } else if (screen === "result") {
-    if (token === "<CR>" || token === "<Space>" || token === "<Esc>") returnToMenu();
+  } else if (screen === "result" && result) {
+    handleResultKey(token, result);
   }
+}
+
+function handleResultKey(token: KeyToken, r: ModeResult): void {
+  const ph = resultPhase;
+  if (ph.kind === "summary") {
+    if ((token === "s" || token === "S") && canSubmit(r) && !resultSubmitted) {
+      resultPhase = { kind: "initials", slots: settings.initials.slice(0, 3), sending: false };
+    } else if (token === "l" || token === "L") {
+      openBoard(r.levelId);
+    } else if (token === "<CR>" || token === "<Space>" || token === "<Esc>") {
+      returnToMenu();
+    }
+    return;
+  }
+  if (ph.kind === "initials") {
+    if (ph.sending) return; // brief lock while the request is in flight
+    if (token === "<Esc>") {
+      resultPhase = { kind: "summary" };
+    } else if (token === "<BS>") {
+      ph.slots = ph.slots.slice(0, -1);
+    } else if (token === "<CR>" && ph.slots.length === 3) {
+      void doSubmit(r, ph);
+    } else {
+      const c = initialsChar(token);
+      if (c && ph.slots.length < 3) ph.slots += c;
+    }
+    return;
+  }
+  // board
+  if (token === "<Esc>") resultPhase = { kind: "summary" };
+  else if (token === "<CR>" || token === "<Space>") returnToMenu();
+}
+
+async function doSubmit(r: ModeResult, ph: ResultPhase & { kind: "initials" }): Promise<void> {
+  ph.sending = true;
+  settings.initials = ph.slots;
+  Storage.setSettings(settings);
+  const ok = await submitScore(r.levelId, ph.slots, r.score);
+  if (screen !== "result") return; // player already left — don't yank the screen
+  if (ok) resultSubmitted = ph.slots;
+  openBoard(r.levelId, ok ? undefined : "couldn't reach the leaderboard — score not sent");
+}
+
+function openBoard(levelId: string, note?: string): void {
+  resultPhase = { kind: "board", entries: null, loading: true, note };
+  void fetchTop(levelId).then((entries) => {
+    if (screen === "result" && resultPhase.kind === "board") {
+      resultPhase = { kind: "board", entries, loading: false, note };
+    }
+  });
 }
 
 const remapper = new KeyRemapper(
@@ -173,6 +236,8 @@ function update(dt: number): void {
     if (mode.done) {
       result = mode.getResult();
       if (result && result.stars >= 1) unlockNext(lastLevelIds, lastLevelId);
+      resultPhase = { kind: "summary" };
+      resultSubmitted = "";
       screen = "result";
       mode = null;
     }
@@ -207,17 +272,61 @@ function renderResult(r: ModeResult): void {
   term.clear();
   const th = term.theme;
   const center = (len: number): number => Math.max(0, Math.floor((term.cols - len) / 2));
+  const ph = resultPhase;
 
   term.drawText(3, center(r.title.length), r.title, { fg: th.fg, bold: true });
   const stars = "★".repeat(r.stars) + "·".repeat(3 - r.stars);
   term.drawText(5, center(stars.length * 2), stars.split("").join(" "), { fg: th.accent, bold: true });
 
-  r.lines.forEach((line, i) => {
-    term.drawText(8 + i, center(line.length), line, { fg: i === 0 ? th.accentAlt : th.dim, bold: i === 0 });
-  });
-
-  const cont = "Enter — menu";
-  term.drawText(8 + r.lines.length + 2, center(cont.length), cont, { fg: th.statusFg });
+  if (ph.kind === "summary") {
+    r.lines.forEach((line, i) => {
+      term.drawText(8 + i, center(line.length), line, { fg: i === 0 ? th.accentAlt : th.dim, bold: i === 0 });
+    });
+    const actions = [
+      "Enter — menu",
+      ...(canSubmit(r) && !resultSubmitted ? ["s — submit score"] : []),
+      ...(resultSubmitted ? [`submitted as ${resultSubmitted}`] : []),
+      "l — leaderboard",
+    ].join("   ");
+    term.drawText(8 + r.lines.length + 2, center(actions.length), actions, { fg: th.statusFg });
+  } else if (ph.kind === "initials") {
+    const title = "ENTER YOUR INITIALS";
+    term.drawText(9, center(title.length), title, { fg: th.accentAlt, bold: true });
+    const slots = [0, 1, 2]
+      .map((i) => ph.slots[i] ?? (i === ph.slots.length && Math.floor(Date.now() / 400) % 2 === 0 ? "▊" : "_"))
+      .join(" ");
+    term.drawText(11, center(slots.length), slots, { fg: th.fg, bold: true });
+    const hint = ph.sending
+      ? "sending…"
+      : ph.slots.length === 3
+        ? "Enter — submit    Backspace — edit    Esc — back"
+        : "type A-Z / 0-9    Esc — back";
+    term.drawText(13, center(hint.length), hint, { fg: th.dim });
+  } else {
+    const title = `TOP 10 — ${r.title}`;
+    term.drawText(7, center(title.length), title, { fg: th.accentAlt, bold: true });
+    if (ph.loading) {
+      term.drawText(9, center(8), "loading…", { fg: th.dim });
+    } else if (!ph.entries) {
+      const msg = "leaderboard unreachable — try again later";
+      term.drawText(9, center(msg.length), msg, { fg: th.danger });
+    } else if (ph.entries.length === 0) {
+      const msg = "no scores yet — be the first!";
+      term.drawText(9, center(msg.length), msg, { fg: th.dim });
+    } else {
+      let mineShown = false;
+      ph.entries.forEach((e, i) => {
+        const shown = r.levelId.startsWith("golf-") ? `${10000 - e.score} keys` : String(e.score);
+        const isMine = !mineShown && e.initials === resultSubmitted && e.score === r.score;
+        if (isMine) mineShown = true;
+        const row = `${String(i + 1).padStart(2)}. ${e.initials}   ${shown.padStart(8)}${isMine ? "  ◀ you" : ""}`;
+        term.drawText(9 + i, center(24), row, { fg: isMine ? th.accent : th.statusFg, bold: isMine });
+      });
+    }
+    if (ph.note) term.drawText(20, center(ph.note.length), ph.note, { fg: th.danger });
+    const hint = "Enter — menu    Esc — back";
+    term.drawText(22, center(hint.length), hint, { fg: th.dim });
+  }
 
   services.flash.render(term.context, term.canvas.width, term.canvas.height);
   services.particles.render(term.context, term.theme.fontFamily);

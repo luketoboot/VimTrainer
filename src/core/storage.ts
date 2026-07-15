@@ -11,6 +11,7 @@ export interface Settings {
   screenScale: number; // CRT size zoom, 0.7 .. 1.5 (1 = default)
   theme: "green" | "amber";
   keybinds: KeybindSettings;
+  initials: string; // last leaderboard initials, prefilled on submit
 }
 
 export interface SaveData {
@@ -33,6 +34,7 @@ const DEFAULT: SaveData = {
     screenScale: 1,
     theme: "green",
     keybinds: { ...DEFAULT_KEYBINDS },
+    initials: "",
   },
   highScores: {},
   stars: {},

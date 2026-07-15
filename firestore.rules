@@ -1,0 +1,20 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Leaderboards: one subcollection of scores per level.
+    // Anyone can read; anyone can append a strictly-validated entry;
+    // nothing can ever be edited or deleted from the client.
+    match /boards/{levelId}/scores/{entry} {
+      allow read: if true;
+      allow create: if
+        levelId.matches('^[a-z0-9-]{1,40}$') &&
+        request.resource.data.keys().hasOnly(['initials', 'score']) &&
+        request.resource.data.initials is string &&
+        request.resource.data.initials.matches('^[A-Z0-9]{3}$') &&
+        request.resource.data.score is int &&
+        request.resource.data.score >= 0 &&
+        request.resource.data.score <= 1000000;
+      allow update, delete: if false;
+    }
+  }
+}
