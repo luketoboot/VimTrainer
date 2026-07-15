@@ -131,15 +131,21 @@ export class TutorialMode implements GameMode {
     term.clear();
     const l = this.lesson;
 
-    // Instruction + progress + taught-key badge + real-world use case.
-    term.drawText(0, 0, `${this.chapter.title}   (${this.index + 1}/${this.chapter.lessons.length})`, { fg: th.dim });
-    term.drawText(1, 0, l.instruction.slice(0, term.cols), { fg: th.fg, bold: true });
-    term.drawText(2, 0, `key: [ ${l.teach} ]     try: ${l.idealKeys}`, { fg: th.accentAlt });
-    wrapText(l.why, Math.max(20, term.cols - 2), 2).forEach((line, i) => {
-      term.drawText(3 + i, 0, line, { fg: th.dim });
-    });
+    // Instruction + progress + taught-key badge + real-world use case. All
+    // prose wraps to the grid width so no word ever runs off the screen; the
+    // buffer starts below whatever the header actually needed.
+    const width = Math.max(20, term.cols - 2);
+    let row = 0;
+    term.drawText(row++, 0, `${this.chapter.title}   (${this.index + 1}/${this.chapter.lessons.length})`, { fg: th.dim });
+    for (const line of wrapText(l.instruction, width, 2)) {
+      term.drawText(row++, 0, line, { fg: th.fg, bold: true });
+    }
+    term.drawText(row++, 0, `key: [ ${l.teach} ]     try: ${l.idealKeys}`, { fg: th.accentAlt });
+    for (const line of wrapText(l.why, width, 2)) {
+      term.drawText(row++, 0, line, { fg: th.dim });
+    }
 
-    const screenRow = 6;
+    const screenRow = row + 1;
     const highlights = l.kind === "reach" ? [{ pos: this.reachTarget, bg: th.accent }] : [];
     drawBuffer(term, this.engine.getView(), { screenRow, highlights });
 

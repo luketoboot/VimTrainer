@@ -5,6 +5,7 @@
 import { VimEngine } from "../engine/engine.ts";
 import type { KeyToken } from "../engine/keymap.ts";
 import { drawBuffer } from "../render/bufferView.ts";
+import { wrapText } from "../render/text.ts";
 import type { GolfPuzzle } from "../levels/curriculum.ts";
 import { Storage } from "../core/storage.ts";
 import { contextForEngine, engineWantsEsc, type RemapContext } from "../core/keybinds.ts";
@@ -104,10 +105,13 @@ export class GolfMode implements GameMode {
     const th = term.theme;
     term.clear();
 
-    term.drawText(0, 0, this.puzzle.hint.slice(0, term.cols), { fg: th.dim });
+    // Hint wraps to the grid so long tips keep every word on screen; the
+    // buffer and target shift down to make room.
+    const hintLines = wrapText(this.puzzle.hint, Math.max(20, term.cols), 2);
+    hintLines.forEach((line, i) => term.drawText(i, 0, line, { fg: th.dim }));
 
-    const workRow = 2;
-    term.drawText(workRow - 1 < 0 ? 0 : 1, 0, "── your buffer ─────────────", { fg: th.accent });
+    const workRow = hintLines.length + 1;
+    term.drawText(workRow - 1, 0, "── your buffer ─────────────", { fg: th.accent });
     drawBuffer(term, this.engine.getView(), { screenRow: workRow });
 
     const workLines = this.engine.lines.length;
@@ -134,13 +138,13 @@ export class GolfMode implements GameMode {
         ? "on pace"
         : this.keystrokes <= this.puzzle.par * 1.5
         ? "over par"
-        : "well over";
+        : "way over";
     const cmd = this.engine.getView().cmdline;
     term.drawStatusLine(
       cmd
         ? ` ${cmd}`
-        : ` ${this.puzzle.title}   keys ${this.keystrokes} / par ${this.puzzle.par}  (${parState})`,
-      `${this.engine.mode.toUpperCase()}   key ${this.lastKey || "—"} `,
+        : ` ${this.puzzle.title}  ${this.keystrokes}/${this.puzzle.par} keys  (${parState})`,
+      `${this.engine.mode.toUpperCase()} ${this.lastKey || "—"} `,
     );
   }
 }

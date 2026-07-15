@@ -6,6 +6,7 @@
 import { VimEngine } from "../engine/engine.ts";
 import type { KeyToken } from "../engine/keymap.ts";
 import { drawBuffer } from "../render/bufferView.ts";
+import { wrapText } from "../render/text.ts";
 import type { DodgeLevel, DodgePattern } from "../levels/curriculum.ts";
 import { Storage } from "../core/storage.ts";
 import { contextForEngine, engineWantsEsc, type RemapContext } from "../core/keybinds.ts";
@@ -53,10 +54,9 @@ interface Floater {
 const TELEGRAPH_DELAY = 0.75; // seconds of warning before a bloom fires
 const LEAP_DISTANCE = 3; // cells moved in one key to count as a mastery "leap"
 
-// Grid row where the playfield starts — row 0 is the hint bar, which would
-// otherwise draw on top of the backdrop's first line. Game logic stays in
-// field space (0..rows-1); only rendering applies this offset.
-const PLAYFIELD_ROW = 1;
+// The hint bar occupies the top rows (wrapped to the grid so every word stays
+// on screen) and the playfield starts below it. Game logic stays in field
+// space (0..rows-1); only rendering applies the offset.
 
 const BACKDROP_POOL = [
   "const engine = require('vim'); // stay sharp and keep moving through the noise",
@@ -75,6 +75,8 @@ export class DodgeMode implements GameMode {
 
   private cols = 40;
   private rows = 16;
+  private hintLines: string[] = [];
+  private playRow = 1; // grid row where the playfield starts (below the hint)
 
   private projectiles: Projectile[] = [];
   private spawnTimer = 0;
@@ -117,7 +119,9 @@ export class DodgeMode implements GameMode {
   init(): void {
     this.spiralPhase = this.rand() * Math.PI * 2;
     this.cols = Math.max(20, this.svc.term.cols);
-    this.rows = Math.max(8, this.svc.term.rows - 2); // leave HUD + statusline
+    this.hintLines = wrapText(this.level.hint, this.cols, 2);
+    this.playRow = this.hintLines.length;
+    this.rows = Math.max(8, this.svc.term.rows - 1 - this.playRow); // leave hint + statusline
     this.buildBackdrop();
     this.engine.load(this.backdrop, { row: Math.floor(this.rows / 2), col: Math.floor(this.cols / 2) });
     this.spawnTimer = 0.8;
@@ -258,7 +262,7 @@ export class DodgeMode implements GameMode {
     this.svc.shake.add(0.7);
     this.svc.flash.trigger(this.svc.term.theme.danger, 0.4, 4);
     this.svc.hitstop.trigger(0.08);
-    const px = pixelForCell(this.svc.term, p.x, p.y);
+    const px = this.pixelForCell(p.x, p.y);
     this.svc.particles.burst(px.x, px.y, { color: this.svc.term.theme.danger, count: 24, speed: 240 });
     if (this.hp <= 0) {
       this.hp = 0;
@@ -488,7 +492,7 @@ export class DodgeMode implements GameMode {
 
   private onLeap(dist: number): void {
     this.leaps++;
-    const px = pixelForCell(this.svc.term, this.engine.cursor.col, this.engine.cursor.row);
+    const px = this.pixelForCell(this.engine.cursor.col, this.engine.cursor.row);
     this.svc.particles.burst(px.x, px.y, {
       color: this.svc.term.theme.accent,
       count: Math.min(18, 6 + dist),
@@ -506,7 +510,7 @@ export class DodgeMode implements GameMode {
     this.score += cleared * 3;
     // Blow away everything currently on the field, plus any pending blooms.
     for (const p of this.projectiles) {
-      const px = pixelForCell(this.svc.term, p.x, p.y);
+      const px = this.pixelForCell(p.x, p.y);
       this.svc.particles.burst(px.x, px.y, { color: this.svc.term.theme.accent, count: 4, speed: 120 });
     }
     this.projectiles = [];
@@ -558,7 +562,7 @@ export class DodgeMode implements GameMode {
         this.bomb = Math.min(1, this.bomb + 0.25);
         const th = this.svc.term.theme;
         this.pushFloater(cc, cr, "+30 ★", th.accentAlt);
-        const px = pixelForCell(this.svc.term, cc, cr);
+        const px = this.pixelForCell(cc, cr);
         this.svc.particles.burst(px.x, px.y, { color: th.accentAlt, count: 18, speed: 200 });
         this.svc.audio.play("perfect");
       }
@@ -568,8 +572,17 @@ export class DodgeMode implements GameMode {
   // --- feel: floating score labels ---
 
   private pushFloater(xCell: number, yCell: number, text: string, color: string): void {
-    const px = pixelForCell(this.svc.term, xCell, yCell);
+    const px = this.pixelForCell(xCell, yCell);
     this.floaters.push({ x: px.x, y: px.y, text, color, life: 0, maxLife: 0.9 });
+  }
+
+  /** Field-space cell -> canvas pixel centre, applying the playfield offset. */
+  private pixelForCell(xCell: number, yCell: number): { x: number; y: number } {
+    const m = this.svc.term.metrics;
+    return {
+      x: m.padding + xCell * m.cellW + m.cellW / 2,
+      y: m.padding + (yCell + this.playRow) * m.cellH + m.cellH / 2,
+    };
   }
 
   private updateFloaters(dt: number): void {
@@ -621,7 +634,7 @@ export class DodgeMode implements GameMode {
     term.clear();
     const th = term.theme;
     // Backdrop, dim, no cursor (we draw our own so it can blink during i-frames).
-    drawBuffer(term, this.engine.getView(), { dimText: true, showCursor: false, screenRow: PLAYFIELD_ROW });
+    drawBuffer(term, this.engine.getView(), { dimText: true, showCursor: false, screenRow: this.playRow });
 
     // Telegraphs: pulse a warning glyph on cells a bloom is about to occupy,
     // blinking faster as the moment of fire approaches.
@@ -629,26 +642,26 @@ export class DodgeMode implements GameMode {
       const rate = t.timer < 0.3 ? 16 : 7;
       const hot = Math.floor(this.blink * rate) % 2 === 0;
       for (const c of t.cells) {
-        term.drawGlyphAtCell(c.x, c.y + PLAYFIELD_ROW, hot ? "▓" : "░", hot ? th.danger : th.dim, true);
+        term.drawGlyphAtCell(c.x, c.y + this.playRow, hot ? "▓" : "░", hot ? th.danger : th.dim, true);
       }
     }
 
     // Pickups: a star to seek out; blinks as it's about to fade.
     for (const pk of this.pickups) {
       const fading = pk.ttl < 1.5 && Math.floor(this.blink * 10) % 2 === 0;
-      if (!fading) term.drawGlyphAtCell(pk.x, pk.y + PLAYFIELD_ROW, "★", th.accentAlt, true);
+      if (!fading) term.drawGlyphAtCell(pk.x, pk.y + this.playRow, "★", th.accentAlt, true);
     }
 
     // Projectiles.
     for (const p of this.projectiles) {
-      term.drawGlyphAtCell(p.x, p.y + PLAYFIELD_ROW, p.glyph, p.color, true);
+      term.drawGlyphAtCell(p.x, p.y + this.playRow, p.glyph, p.color, true);
     }
 
     // Cursor: bright block; blink while invulnerable.
     const visible = this.invuln <= 0 || Math.floor(this.blink * 12) % 2 === 0;
     if (visible) {
       const ch = this.engine.lines[this.engine.cursor.row]?.[this.engine.cursor.col] ?? " ";
-      term.drawGlyphAtCell(this.engine.cursor.col, this.engine.cursor.row + PLAYFIELD_ROW, "▊", th.fg, true);
+      term.drawGlyphAtCell(this.engine.cursor.col, this.engine.cursor.row + this.playRow, "▊", th.fg, true);
       void ch;
     }
 
@@ -659,13 +672,13 @@ export class DodgeMode implements GameMode {
     // HUD.
     const hearts = "♥".repeat(this.hp) + "·".repeat(Math.max(0, this.level.startHp - this.hp));
     const timeLeft = Math.max(0, this.level.duration - this.elapsed).toFixed(1);
-    term.drawText(0, 0, this.level.hint.slice(0, term.cols), { fg: th.dim });
+    this.hintLines.forEach((line, i) => term.drawText(i, 0, line, { fg: th.dim }));
     const filled = Math.round(this.bomb * 5);
     const bombLabel =
       this.bomb >= 1 ? "BOMB:dd" : `bomb ${"▮".repeat(filled)}${"▯".repeat(5 - filled)}`;
     term.drawStatusLine(
-      ` ${this.level.title}   ${hearts}   ⏱ ${timeLeft}s`,
-      `${bombLabel}   score ${this.score} `,
+      ` ${this.level.title}  ${hearts}  ⏱ ${timeLeft}s`,
+      `${bombLabel}  score ${this.score} `,
     );
   }
 
@@ -700,14 +713,3 @@ function ringPreview(ox: number, oy: number): { x: number; y: number }[] {
   ];
 }
 
-function pixelForCell(
-  term: GameServices["term"],
-  xCell: number,
-  yCell: number,
-): { x: number; y: number } {
-  const m = term.metrics;
-  return {
-    x: m.padding + xCell * m.cellW + m.cellW / 2,
-    y: m.padding + (yCell + PLAYFIELD_ROW) * m.cellH + m.cellH / 2,
-  };
-}

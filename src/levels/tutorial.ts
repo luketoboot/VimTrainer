@@ -33,7 +33,7 @@ export const TUTORIAL_CHAPTERS: TutorialChapter[] = [
   {
     id: "tut-motions",
     title: "Chapter 1 · Motions",
-    skill: "move without arrows",
+    skill: "move w/o arrows",
     hint: "Learn the core cursor motions one at a time.",
     lessons: [
       { kind: "reach", teach: "l", why: "Fine positioning for a char or two. For real distance, w/f/$ are faster — the drills score you on it.", instruction: "Move RIGHT. Press l to reach the marker.", buffer: [TRACK], cursor: { row: 0, col: 0 }, idealKeys: "llll" },
@@ -53,7 +53,7 @@ export const TUTORIAL_CHAPTERS: TutorialChapter[] = [
   {
     id: "tut-editing",
     title: "Chapter 2 · Editing",
-    skill: "delete, change, insert",
+    skill: "delete + insert",
     hint: "Operators + insert mode — the real power of Vim.",
     lessons: [
       { kind: "text", teach: "x", why: "The typo-zapper: delete the char under the cursor without ever entering insert mode.", instruction: "Delete the extra 'l' with x.", buffer: ["helllo"], cursor: { row: 0, col: 2 }, idealKeys: "x", target: ["hello"] },
@@ -69,7 +69,7 @@ export const TUTORIAL_CHAPTERS: TutorialChapter[] = [
   {
     id: "tut-advanced",
     title: "Chapter 3 · Power",
-    skill: "find, search, match, visual",
+    skill: "search + visual",
     hint: "The moves that make you fast.",
     lessons: [
       { kind: "reach", teach: "t", why: "Stop just short: ct, changes text up to a comma; dt) deletes up to the paren.", instruction: "Stop just BEFORE the 'o': t then o.", buffer: ["hello world"], cursor: { row: 0, col: 0 }, idealKeys: "to" },
@@ -83,7 +83,7 @@ export const TUTORIAL_CHAPTERS: TutorialChapter[] = [
   {
     id: "tut-mastery",
     title: "Chapter 4 · Mastery",
-    skill: "substitute, macros, block",
+    skill: ":s, macros, block",
     hint: "The power tools: :s, macros, and visual block.",
     lessons: [
       { kind: "text", teach: ":s//g", why: "Fix every occurrence on the line in one command instead of hunting each one.", instruction: "Replace every 'foo' with 'bar' on the line: :s/foo/bar/g then Enter.", buffer: ["foo foo foo"], cursor: { row: 0, col: 0 }, idealKeys: ":s/foo/bar/g<CR>", target: ["bar bar bar"] },

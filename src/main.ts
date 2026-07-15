@@ -12,6 +12,7 @@ import { dailyLevel, dailyLevelId, seededRng, shareText, todayId } from "./core/
 import { Coach } from "./core/coach.ts";
 import { StatsTracker } from "./core/stats.ts";
 import { TerminalRenderer } from "./render/terminal.ts";
+import { wrapText } from "./render/text.ts";
 import { AMBER_PHOSPHOR, GREEN_PHOSPHOR, scaledMetrics } from "./render/theme.ts";
 import { ScreenShake } from "./juice/shake.ts";
 import { ParticlePool } from "./juice/particles.ts";
@@ -80,24 +81,32 @@ function canSubmit(r: ModeResult): boolean {
 }
 
 // --- sizing ---
-// Cap the board to a fixed design size so it stays a tidy rectangle centered by
-// the flex container (#app), instead of stretching to fill the whole window and
-// hugging the top-left. On small windows it shrinks to fit. The cap is sized to
-// the content (menus ~48 cols, drill buffers ~44) — much wider and the screens
-// visibly hug the canvas's own top-left corner instead.
-const MAX_COLS = 56;
-const MAX_ROWS = 28;
+// The board is always the full design grid (56×28) — every screen lays out its
+// text for exactly this many cells, so dropping columns or rows would clip
+// words. The screen-size dial zooms the cells; when the window (or a big zoom)
+// can't fit the whole grid, the cells shrink further — never the grid. The
+// fixed rectangle also stays tidily centered by the flex container (#app).
+const GRID_COLS = 56;
+const GRID_ROWS = 28;
 function fit(): void {
   const app = document.getElementById("app")!;
-  // The screen-size dial zooms the cells; the grid stays the same, so gameplay
-  // is identical at every size. Shrinks to fit small windows either way.
-  const m = scaledMetrics(settings.screenScale);
+  let scale = settings.screenScale;
+  let m = scaledMetrics(scale);
+  const overflows = (): boolean =>
+    GRID_COLS * m.cellW + m.padding * 2 > app.clientWidth ||
+    (GRID_ROWS + 1) * m.cellH + m.padding * 2 > app.clientHeight; // +1: statusline strip
+  while (overflows() && scale > 0.35) {
+    scale = Math.round((scale - 0.05) * 100) / 100;
+    m = scaledMetrics(scale);
+  }
   term.metrics = m;
-  const availCols = Math.floor((app.clientWidth - m.padding * 2) / m.cellW);
-  const availRows = Math.floor((app.clientHeight - m.padding * 2) / m.cellH);
-  const cols = Math.max(20, Math.min(MAX_COLS, availCols));
-  const rows = Math.max(10, Math.min(MAX_ROWS, availRows));
-  term.resize(cols * m.cellW + m.padding * 2, rows * m.cellH + m.padding * 2);
+  // Height includes one extra cell for the statusline strip (drawn at row
+  // GRID_ROWS, below the grid). The -1 keeps resize()'s row count at exactly
+  // GRID_ROWS while the strip still fits fully inside the canvas.
+  term.resize(
+    GRID_COLS * m.cellW + m.padding * 2,
+    (GRID_ROWS + 1) * m.cellH + m.padding * 2 - 1,
+  );
 }
 window.addEventListener("resize", fit);
 fit();
@@ -363,8 +372,14 @@ function renderResult(r: ModeResult): void {
   term.drawText(5, center(stars.length * 2), stars.split("").join(" "), { fg: th.accent, bold: true });
 
   if (ph.kind === "summary") {
+    // Wrap every line to the grid so long summaries and the action bar never
+    // run off the screen edge.
+    const width = Math.max(20, term.cols - 4);
+    let row = 8;
     r.lines.forEach((line, i) => {
-      term.drawText(8 + i, center(line.length), line, { fg: i === 0 ? th.accentAlt : th.dim, bold: i === 0 });
+      for (const seg of wrapText(line, width, 2)) {
+        term.drawText(row++, center(seg.length), seg, { fg: i === 0 ? th.accentAlt : th.dim, bold: i === 0 });
+      }
     });
     const actions = [
       "Enter — menu",
@@ -373,8 +388,13 @@ function renderResult(r: ModeResult): void {
       "l — leaderboard",
       ...(getGolfPuzzle(r.levelId) ? ["r — watch par"] : []),
       ...(r.levelId.startsWith("daily-") ? [shareCopied ? "copied ✓" : "c — share"] : []),
-    ].join("   ");
-    term.drawText(8 + r.lines.length + 2, center(actions.length), actions, { fg: th.statusFg });
+      // "·" separators survive wrapping (wrapText collapses runs of spaces),
+      // so the actions stay visually grouped even across two lines.
+    ].join(" · ");
+    row++;
+    for (const seg of wrapText(actions, width, 2)) {
+      term.drawText(row++, center(seg.length), seg, { fg: th.statusFg });
+    }
   } else if (ph.kind === "initials") {
     const title = "ENTER YOUR INITIALS";
     term.drawText(9, center(title.length), title, { fg: th.accentAlt, bold: true });

@@ -158,11 +158,14 @@ export class TerminalRenderer {
     const w = this.cols * this.metrics.cellW;
     ctx.fillStyle = this.theme.statusBg;
     ctx.fillRect(padding, y, w, cellH);
-    this.drawText(this.rows, 0, left, { fg: this.theme.statusFg, bold: true });
-    if (right) {
-      const startCol = Math.max(0, this.cols - right.length);
-      this.drawText(this.rows, startCol, right, { fg: this.theme.statusFg });
-    }
+    // The right side claims its columns first; the left is ellipsized to what
+    // remains so the two never overwrite each other or run off the grid.
+    const r = right.slice(0, this.cols);
+    const startCol = Math.max(0, this.cols - r.length);
+    const maxLeft = r ? startCol - 1 : this.cols;
+    const l = left.length > maxLeft ? left.slice(0, Math.max(0, maxLeft - 1)) + "…" : left;
+    this.drawText(this.rows, 0, l, { fg: this.theme.statusFg, bold: true });
+    if (r) this.drawText(this.rows, startCol, r, { fg: this.theme.statusFg });
   }
 
   /** Subtle CRT scanlines + vignette drawn over everything, fixed to the screen

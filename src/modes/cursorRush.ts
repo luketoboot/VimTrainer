@@ -6,6 +6,7 @@ import { VimEngine } from "../engine/engine.ts";
 import type { KeyToken } from "../engine/keymap.ts";
 import type { Pos } from "../engine/types.ts";
 import { drawBuffer } from "../render/bufferView.ts";
+import { wrapText } from "../render/text.ts";
 import type { CursorRushLevel } from "../levels/curriculum.ts";
 import { Storage } from "../core/storage.ts";
 import { contextForEngine, engineWantsEsc, type RemapContext } from "../core/keybinds.ts";
@@ -16,14 +17,15 @@ interface Rating {
   color: string;
 }
 
-// Grid row where the buffer starts — rows 0/1 belong to the hint bar and the
-// rating popup, which would otherwise draw on top of the buffer's first line.
-const PLAYFIELD_ROW = 2;
-
 export class CursorRushMode implements GameMode {
   private svc: GameServices;
   private level: CursorRushLevel;
   private engine = new VimEngine();
+
+  // Hint bar wrapped to the grid (so long tips keep every word on screen),
+  // plus one row for the rating popup; the buffer starts below both.
+  private hintLines: string[] = [];
+  private playRow = 2;
 
   private target: Pos = { row: 0, col: 0 };
   private spawnFrom: Pos = { row: 0, col: 0 };
@@ -51,6 +53,8 @@ export class CursorRushMode implements GameMode {
 
   init(): void {
     this.engine.load(this.level.buffer, { row: 0, col: 0 });
+    this.hintLines = wrapText(this.level.hint, Math.max(20, this.svc.term.cols), 2);
+    this.playRow = this.hintLines.length + 1;
     this.spawnFrom = { ...this.engine.cursor };
     this.pickTarget();
     this.svc.audio.play("start");
@@ -116,7 +120,7 @@ export class CursorRushMode implements GameMode {
     this.ratingFade = 1;
 
     // Juice: burst at the landing cell, flash, a touch of shake on big combos.
-    const px = this.svc.term.gridToPixel(this.target.row + PLAYFIELD_ROW, this.target.col);
+    const px = this.svc.term.gridToPixel(this.target.row + this.playRow, this.target.col);
     this.svc.particles.burst(px.x, px.y, {
       color: rating.color,
       count: rating.label === "PERFECT" ? 22 : 12,
@@ -240,7 +244,7 @@ export class CursorRushMode implements GameMode {
     term.clear();
     drawBuffer(term, this.engine.getView(), {
       dimText: true,
-      screenRow: PLAYFIELD_ROW,
+      screenRow: this.playRow,
       highlights: [{ pos: this.target, bg: term.theme.accent }],
     });
 
@@ -254,16 +258,16 @@ export class CursorRushMode implements GameMode {
     term.drawStatusLine(
       cmd
         ? ` ${cmd}`
-        : ` ${this.level.title}   ${this.targetsHit}/${this.level.targetCount}   ⏱ ${timeStr}s${comboStr}`,
-      `score ${this.score}   key ${this.lastKey || "—"} `,
+        : ` ${this.level.title}  ${this.targetsHit}/${this.level.targetCount}  ⏱${timeStr}s${comboStr}`,
+      `score ${this.score}  ${this.lastKey || "—"} `,
     );
 
     // Top hint bar + rating popup.
-    term.drawText(0, 0, this.level.hint.slice(0, term.cols), { fg: term.theme.dim });
+    this.hintLines.forEach((line, i) => term.drawText(i, 0, line, { fg: term.theme.dim }));
     if (this.lastRating && this.ratingFade > 0) {
       const label = `${this.lastRating.label}!`;
       const col = Math.max(0, Math.floor((term.cols - label.length) / 2));
-      term.drawText(1, col, label, { fg: this.lastRating.color, bold: true });
+      term.drawText(this.playRow - 1, col, label, { fg: this.lastRating.color, bold: true });
     }
   }
 }

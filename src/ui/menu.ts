@@ -441,29 +441,44 @@ export class MenuScreen {
     term.drawText(2, 4, m.subtitle, { fg: th.dim });
 
     const ids = this.ids();
-    m.entries.forEach((e, i) => {
-      const row = 4 + i * 2;
+    // Long lists scroll behind a fixed-height viewport so every row — and the
+    // hint under the list — always stays on the grid. "more" markers show
+    // what's hidden above/below.
+    const n = m.entries.length;
+    const maxVisible = Math.max(3, Math.floor((term.rows - 9) / 2));
+    const shown = Math.min(n, maxVisible);
+    const first = Math.max(0, Math.min(this.levelIndex - Math.floor(maxVisible / 2), n - shown));
+    if (first > 0) term.drawText(3, 4, `↑ ${first} more`, { fg: th.dim });
+    m.entries.slice(first, first + shown).forEach((e, vi) => {
+      const i = first + vi;
+      const row = 4 + vi * 2;
       const sel = i === this.levelIndex;
       const unlocked = isLevelUnlocked(ids, i);
       const stars = Storage.getStars(e.id);
-      const lock = unlocked ? "" : "🔒 ";
+      // Single-cell glyph: the grid draws one UTF-16 unit per cell, so emoji
+      // (surrogate pairs) come out as two broken boxes.
+      const lock = unlocked ? "" : "× ";
       const starStr = "★".repeat(stars).padEnd(3, "·");
       const marker = sel ? "▶ " : "  ";
       const fg = !unlocked ? th.dim : sel ? th.fg : th.statusFg;
       term.drawText(row, 4, `${marker}${lock}${e.title}`.padEnd(26), { fg, bold: sel && unlocked });
       term.drawText(row, 32, unlocked ? starStr : "", { fg: th.accent });
-      term.drawText(row, 38, e.skill, { fg: th.dim });
+      term.drawText(row, 38, e.skill.slice(0, Math.max(0, term.cols - 38)), { fg: th.dim });
     });
+    const below = n - first - shown;
+    if (below > 0) term.drawText(4 + shown * 2, 4, `↓ ${below} more`, { fg: th.dim });
 
-    const detail = 4 + m.entries.length * 2 + 1;
+    const detail = 4 + shown * 2 + 1;
     const sel = m.entries[this.levelIndex];
     if (sel) {
       const unlocked = isLevelUnlocked(ids, this.levelIndex);
-      term.drawText(detail, 4, unlocked ? sel.hint : "Clear the previous level to unlock this one.", {
-        fg: unlocked ? th.statusFg : th.dim,
+      const hint = unlocked ? sel.hint : "Clear the previous level to unlock this one.";
+      const hintLines = wrapText(hint, Math.max(20, term.cols - 8), 2);
+      hintLines.forEach((line, i) => {
+        term.drawText(detail + i, 4, line, { fg: unlocked ? th.statusFg : th.dim });
       });
       const best = this.bestLabel(m.key, sel.id);
-      if (best) term.drawText(detail + 1, 4, best, { fg: th.accentAlt });
+      if (best) term.drawText(detail + hintLines.length, 4, best, { fg: th.accentAlt });
     }
     term.drawStatusLine(" j/k move   Enter start   h/Esc back ", "VimTrainer ");
   }
@@ -506,7 +521,8 @@ export class MenuScreen {
       term.drawText(row, 4, `${sel ? "▶ " : "  "}${label}`.padEnd(16), { fg: sel ? th.fg : th.statusFg, bold: sel });
       term.drawText(row, 22, value, { fg: th.accentAlt });
     });
-    term.drawStatusLine(" j/k move   h/l adjust   Enter toggle   Esc back ", "VimTrainer ");
+    // No brand on the right — this line needs every column for its own words.
+    term.drawStatusLine(" j/k move   h/l adjust   Enter toggle   Esc back ");
   }
 
   private renderStats(): void {
@@ -608,11 +624,14 @@ export class MenuScreen {
       term.drawText(y, 28, value, { fg: th.accentAlt });
     });
 
-    // Why-you'd-want-this explanation for the selected row.
+    // Why-you'd-want-this explanation for the selected row. Wrapped to the
+    // grid and capped so it never runs into the capture prompt or off-screen.
     const row = rows[this.keybindIndex]!;
     const why = row.kind === "preset" ? getPreset(kb.preset).why : KB_WHY[row.kind] ?? "";
     const whyRow = 4 + rows.length * 2 + 1;
-    wrap(why, Math.max(20, term.cols - 8)).forEach((line, i) => {
+    const whyMax = Math.max(1, term.rows - whyRow - 3);
+    const whyLines = why ? wrapText(why, Math.max(20, term.cols - 8), whyMax) : [];
+    whyLines.forEach((line, i) => {
       term.drawText(whyRow + i, 4, line, { fg: th.dim });
     });
 
@@ -621,31 +640,14 @@ export class MenuScreen {
         this.capture.stage === "src"
           ? "PRESS the key you want to remap…   (Esc cancels)"
           : `"${this.capture.src}" will act as…   PRESS the target key   (Esc cancels)`;
-      term.drawText(whyRow + 4, 4, msg, { fg: th.accent, bold: true });
+      wrapText(msg, Math.max(20, term.cols - 8), 2).forEach((line, i) => {
+        term.drawText(whyRow + whyLines.length + 1 + i, 4, line, { fg: th.accent, bold: true });
+      });
     }
 
-    term.drawStatusLine(
-      this.capture ? " capturing key… " : " j/k move   h/l adjust   Enter select   Esc back ",
-      "VimTrainer ",
-    );
+    // No brand on the right — this line needs every column for its own words.
+    term.drawStatusLine(this.capture ? " capturing key… " : " j/k move   h/l adjust   Enter select   Esc back ");
   }
-}
-
-/** Greedy word-wrap for the explanation blurbs. */
-function wrap(text: string, width: number): string[] {
-  const words = text.split(/\s+/).filter(Boolean);
-  const lines: string[] = [];
-  let cur = "";
-  for (const w of words) {
-    if (cur.length + w.length + 1 > width && cur) {
-      lines.push(cur);
-      cur = w;
-    } else {
-      cur = cur ? `${cur} ${w}` : w;
-    }
-  }
-  if (cur) lines.push(cur);
-  return lines;
 }
 
 function cx(term: TerminalRenderer, len: number): number {
