@@ -1,4 +1,4 @@
-# VimTrainer
+# VimTendo
 
 A browser game that builds **Vim muscle memory** through reflex and puzzle gameplay.
 The game world *is* a real Vim buffer — every mode runs on one authentic Vim engine.

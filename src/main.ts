@@ -442,7 +442,7 @@ function renderResult(r: ModeResult): void {
 
   services.flash.render(term.context, term.canvas.width, term.canvas.height);
   services.particles.render(term.context, term.theme.fontFamily);
-  term.drawStatusLine(` result — ${r.title} `, "VimTrainer ");
+  term.drawStatusLine(` result — ${r.title} `, "VimTendo ");
 }
 
 const loop = new GameLoop({ update, render });

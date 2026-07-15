@@ -51,7 +51,7 @@ export function dailyLevel(date: string): DodgeLevel {
 export function shareText(date: string, score: number, stars: number, survivedLine: string): string {
   const starStr = "★".repeat(stars) + "☆".repeat(3 - stars);
   return [
-    `VimTrainer Daily ${date}`,
+    `VimTendo Daily ${date}`,
     `${starStr}  ${score} pts — ${survivedLine}`,
     "https://luketoboot.github.io/VimTrainer/",
   ].join("\n");

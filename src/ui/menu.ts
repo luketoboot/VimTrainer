@@ -391,7 +391,7 @@ export class MenuScreen {
   private title(): void {
     const term = this.term;
     const th = term.theme;
-    const t = "V I M T R A I N E R";
+    const t = "V I M T E N D O";
     term.drawText(1, cx(term, t.length), t, { fg: th.fg, bold: true });
     term.drawText(2, cx(term, 24), "build the muscle memory", { fg: th.dim });
   }
@@ -433,7 +433,7 @@ export class MenuScreen {
     const setSel = this.modeIndex === MODES.length + 2;
     term.drawText(setRow, 4, `${setSel ? "▶ " : "  "}SETTINGS`, { fg: setSel ? th.accent : th.fg, bold: setSel });
 
-    term.drawStatusLine(" j/k move   Enter select ", "VimTrainer ");
+    term.drawStatusLine(" j/k move   Enter select ", "VimTendo ");
   }
 
   private renderLevels(): void {
@@ -484,7 +484,7 @@ export class MenuScreen {
       const best = this.bestLabel(m.key, sel.id);
       if (best) term.drawText(detail + hintLines.length, 4, best, { fg: th.accentAlt });
     }
-    term.drawStatusLine(" j/k move   Enter start   h/Esc back ", "VimTrainer ");
+    term.drawStatusLine(" j/k move   Enter start   h/Esc back ", "VimTendo ");
   }
 
   private bestLabel(mode: ModeKey, id: string): string {
@@ -593,7 +593,7 @@ export class MenuScreen {
       }
     }
 
-    term.drawStatusLine(" Esc back ", "VimTrainer ");
+    term.drawStatusLine(" Esc back ", "VimTendo ");
   }
 
   private renderKeybinds(): void {
