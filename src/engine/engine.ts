@@ -203,6 +203,22 @@ export class VimEngine {
     // Record into a macro only tokens that occur *during* recording — not the
     // q{reg} that starts it, nor the q that stops it (recording becomes null then).
     if (wasRecording && this.recording && !this.replaying) this.recording.keys.push(token);
+    // A token that leaves the engine fully idle in normal mode completed a
+    // pure motion, a yank, or nothing (edits always commitChange, which clears
+    // the accumulator). Drop those tokens so travel never leaks into the next
+    // change's dot-repeat record — `.` replays the change only, like real Vim.
+    if (
+      !this.replaying &&
+      this.mode === "normal" &&
+      !this.cmdlineActive &&
+      this.pendingOperator === null &&
+      this.waiting === null &&
+      !this.gPending &&
+      this.pendingCount === "" &&
+      this.pendingRegister === null
+    ) {
+      this.cmdTokens = [];
+    }
     return this.events;
   }
 
@@ -280,6 +296,7 @@ export class VimEngine {
     // Search family.
     if (token === "/" || token === "?") {
       this.cmdlineActive = true;
+      this.cmdlineKind = "search"; // a prior ":" leaves kind at "ex" — reset it
       this.cmdlineDir = token === "/" ? 1 : -1;
       this.cmdlineText = "";
       return;

@@ -24,6 +24,7 @@ import { CursorRushMode } from "./modes/cursorRush.ts";
 import { ReplayMode } from "./modes/replay.ts";
 import { DodgeMode } from "./modes/dodge.ts";
 import { GolfMode } from "./modes/golf.ts";
+import { HotfixMode } from "./modes/hotfix.ts";
 import { TutorialMode } from "./modes/tutorial.ts";
 import {
   CURSOR_RUSH_LEVELS,
@@ -32,6 +33,7 @@ import {
   getGolfPuzzle,
 } from "./levels/curriculum.ts";
 import { TUTORIAL_CHAPTERS } from "./levels/tutorial.ts";
+import { HOTFIX_LEVELS } from "./levels/hotfix.ts";
 import type { GameMode, GameServices, ModeResult } from "./modes/mode.ts";
 import type { KeyToken } from "./engine/keymap.ts";
 
@@ -277,6 +279,10 @@ function handleMenuAction(action: MenuAction): void {
     lastLevelIds = DODGE_LEVELS.map((l) => l.id);
     lastLevelId = action.level.id;
     mode = new DodgeMode(services, action.level);
+  } else if (action.mode === "hotfix") {
+    lastLevelIds = HOTFIX_LEVELS.map((l) => l.id);
+    lastLevelId = action.level.id;
+    mode = new HotfixMode(services, action.level);
   } else {
     lastLevelIds = GOLF_PUZZLES.map((p) => p.id);
     lastLevelId = action.puzzle.id;

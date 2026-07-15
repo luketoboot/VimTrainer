@@ -14,13 +14,14 @@ import {
   type GolfPuzzle,
 } from "../levels/curriculum.ts";
 import { TUTORIAL_CHAPTERS, type TutorialChapter } from "../levels/tutorial.ts";
+import { HOTFIX_LEVELS, type HotfixLevel } from "../levels/hotfix.ts";
 import { Storage, type Settings } from "../core/storage.ts";
 import { isLevelUnlocked } from "../core/progression.ts";
 import { getPreset, type InsertEsc, type PresetId } from "../core/keybinds.ts";
 import { todayId } from "../core/daily.ts";
 import { categoryMix, emptyStats, fingerprintVerdict, neverUsed, topKeys } from "../core/stats.ts";
 
-export type ModeKey = "tutorial" | "rush" | "dodge" | "golf";
+export type ModeKey = "tutorial" | "rush" | "dodge" | "golf" | "hotfix";
 
 export type MenuAction =
   | { type: "none" }
@@ -29,7 +30,8 @@ export type MenuAction =
   | { type: "start"; mode: "tutorial"; chapter: TutorialChapter }
   | { type: "start"; mode: "rush"; level: CursorRushLevel }
   | { type: "start"; mode: "dodge"; level: DodgeLevel }
-  | { type: "start"; mode: "golf"; puzzle: GolfPuzzle };
+  | { type: "start"; mode: "golf"; puzzle: GolfPuzzle }
+  | { type: "start"; mode: "hotfix"; level: HotfixLevel };
 
 interface Entry {
   id: string;
@@ -50,6 +52,7 @@ const MODES: ModeDef[] = [
   { key: "rush", title: "CURSOR RUSH", subtitle: "race the cursor onto targets — fewest keys wins", entries: CURSOR_RUSH_LEVELS },
   { key: "dodge", title: "DODGE", subtitle: "survive bullet-hell using Vim motions", entries: DODGE_LEVELS },
   { key: "golf", title: "GOLF", subtitle: "transform text under a keystroke par", entries: GOLF_PUZZLES },
+  { key: "hotfix", title: "HOTFIX", subtitle: "real edits against the deploy clock — :wq ships", entries: HOTFIX_LEVELS },
 ];
 
 type State = "mode" | "levels" | "settings" | "keybinds" | "stats";
@@ -192,6 +195,7 @@ export class MenuScreen {
     if (m.key === "tutorial") return { type: "start", mode: "tutorial", chapter: TUTORIAL_CHAPTERS[this.levelIndex]! };
     if (m.key === "rush") return { type: "start", mode: "rush", level: CURSOR_RUSH_LEVELS[this.levelIndex]! };
     if (m.key === "dodge") return { type: "start", mode: "dodge", level: DODGE_LEVELS[this.levelIndex]! };
+    if (m.key === "hotfix") return { type: "start", mode: "hotfix", level: HOTFIX_LEVELS[this.levelIndex]! };
     return { type: "start", mode: "golf", puzzle: GOLF_PUZZLES[this.levelIndex]! };
   }
 

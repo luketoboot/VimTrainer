@@ -196,6 +196,19 @@ describe("dot repeat", () => {
   it(". repeats dd", () => {
     expect(run("a\nb\nc\nd", { row: 0, col: 0 }, "dd.").text).toBe("c\nd");
   });
+  it(". repeats only the change, not the travel before it", () => {
+    // The /qq search must not leak into the repeated change.
+    const r = run("one qq\ntwo qq", { row: 0, col: 0 }, "/qq<CR>A!<Esc>/qq<CR>.");
+    expect(r.text).toBe("one qq!\ntwo qq!");
+  });
+});
+
+describe("cmdline kind", () => {
+  it("/ search still works after an ex command", () => {
+    // ":" used to leave the cmdline stuck in ex mode, breaking later searches.
+    const r = run("foo\nbar\nfoo", { row: 0, col: 0 }, ":s/foo/baz/<CR>/foo<CR>x");
+    expect(r.text).toBe("baz\nbar\noo");
+  });
 });
 
 describe("visual mode", () => {
