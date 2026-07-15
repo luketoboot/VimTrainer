@@ -8,7 +8,7 @@ import { unlockNext } from "./core/progression.ts";
 import { KeyRemapper } from "./core/keybinds.ts";
 import { MusicPlayer } from "./core/music.ts";
 import { TerminalRenderer } from "./render/terminal.ts";
-import { AMBER_PHOSPHOR, GREEN_PHOSPHOR } from "./render/theme.ts";
+import { AMBER_PHOSPHOR, GREEN_PHOSPHOR, scaledMetrics } from "./render/theme.ts";
 import { ScreenShake } from "./juice/shake.ts";
 import { ParticlePool } from "./juice/particles.ts";
 import { Flash } from "./juice/flash.ts";
@@ -65,7 +65,10 @@ const MAX_COLS = 56;
 const MAX_ROWS = 28;
 function fit(): void {
   const app = document.getElementById("app")!;
-  const m = term.metrics;
+  // The screen-size dial zooms the cells; the grid stays the same, so gameplay
+  // is identical at every size. Shrinks to fit small windows either way.
+  const m = scaledMetrics(settings.screenScale);
+  term.metrics = m;
   const availCols = Math.floor((app.clientWidth - m.padding * 2) / m.cellW);
   const availRows = Math.floor((app.clientHeight - m.padding * 2) / m.cellH);
   const cols = Math.max(20, Math.min(MAX_COLS, availCols));
@@ -115,11 +118,19 @@ function syncMusic(): void {
   music.play(screen === "playing" ? "game" : "menu");
 }
 
+// Firefox/Safari only unlock audio on a real click — keyboard gestures don't
+// count for their autoplay policy. Any click anywhere kicks the music awake.
+window.addEventListener("pointerdown", () => {
+  music.retryNow();
+  syncMusic();
+});
+
 function handleMenuAction(action: MenuAction): void {
   if (action.type === "settingsChanged") {
     audio.volume = settings.volume;
     music.volume = settings.musicVolume;
     term.theme = settings.theme === "amber" ? AMBER_PHOSPHOR : GREEN_PHOSPHOR;
+    fit(); // screen-size dial changes the metrics — resize live
     Storage.setSettings(settings);
     return;
   }
@@ -176,6 +187,15 @@ function render(): void {
   if (screen === "menu") menu.render();
   else if (screen === "playing" && mode) mode.render();
   else if (screen === "result" && result) renderResult(result);
+
+  // Tiny music state indicator (menu only): ♪ = playing, ♪✕ = not playing.
+  // Makes "why is it silent" diagnosable at a glance.
+  if (screen === "menu") {
+    const on = music.playing;
+    term.drawText(0, Math.max(0, term.cols - 3), on ? " ♪" : "♪✕", {
+      fg: on ? term.theme.dim : term.theme.danger,
+    });
+  }
 
   // CRT post stack: phosphor bloom first so glyphs glow, then the scanline mask
   // and vignette stay crisp on top of the glow.

@@ -8,6 +8,7 @@ export interface Settings {
   musicVolume: number;
   scanlines: boolean;
   bloom: number; // CRT phosphor glow, 0 (off) .. 1 (full Vectrex)
+  screenScale: number; // CRT size zoom, 0.7 .. 1.5 (1 = default)
   theme: "green" | "amber";
   keybinds: KeybindSettings;
 }
@@ -29,6 +30,7 @@ const DEFAULT: SaveData = {
     musicVolume: 0.6,
     scanlines: true,
     bloom: 0.4,
+    screenScale: 1,
     theme: "green",
     keybinds: { ...DEFAULT_KEYBINDS },
   },

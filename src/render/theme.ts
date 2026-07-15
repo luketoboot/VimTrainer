@@ -53,3 +53,14 @@ export const DEFAULT_METRICS: GridMetrics = {
   fontSize: 22,
   padding: 24,
 };
+
+/** Metrics zoomed by the screen-size setting: the grid keeps the same number
+ *  of cells, each cell just renders larger or smaller. */
+export function scaledMetrics(scale: number): GridMetrics {
+  return {
+    cellW: Math.max(8, Math.round(DEFAULT_METRICS.cellW * scale)),
+    cellH: Math.max(14, Math.round(DEFAULT_METRICS.cellH * scale)),
+    fontSize: Math.max(10, Math.round(DEFAULT_METRICS.fontSize * scale)),
+    padding: Math.max(8, Math.round(DEFAULT_METRICS.padding * scale)),
+  };
+}

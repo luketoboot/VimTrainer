@@ -49,7 +49,7 @@ const MODES: ModeDef[] = [
 ];
 
 type State = "mode" | "levels" | "settings" | "keybinds";
-const SETTINGS_ROWS = ["volume", "music", "bloom", "scanlines", "theme", "keybinds", "back"] as const;
+const SETTINGS_ROWS = ["volume", "music", "bloom", "screen", "scanlines", "theme", "keybinds", "back"] as const;
 
 // Rows of the keybinds sub-screen. Custom binds are appended dynamically.
 type KbRow =
@@ -229,6 +229,11 @@ export class MenuScreen {
     }
     if (row === "bloom") {
       this.settings.bloom = clamp01(Math.round((this.settings.bloom + dir * 0.1) * 10) / 10);
+      return { type: "settingsChanged" };
+    }
+    if (row === "screen") {
+      const next = Math.round((this.settings.screenScale + dir * 0.1) * 10) / 10;
+      this.settings.screenScale = Math.max(0.7, Math.min(1.5, next));
       return { type: "settingsChanged" };
     }
     if (row === "scanlines") {
@@ -448,6 +453,7 @@ export class MenuScreen {
       ["Volume", `${Math.round(this.settings.volume * 100)}%   ${bar(this.settings.volume)}`],
       ["Music", `${Math.round(this.settings.musicVolume * 100)}%   ${bar(this.settings.musicVolume)}`],
       ["CRT Bloom", `${Math.round(this.settings.bloom * 100)}%   ${bar(this.settings.bloom)}`],
+      ["Screen size", `${Math.round(this.settings.screenScale * 100)}%   ${bar((this.settings.screenScale - 0.7) / 0.8)}`],
       ["Scanlines", this.settings.scanlines ? "ON" : "OFF"],
       ["Theme", this.settings.theme === "green" ? "GREEN phosphor" : "AMBER phosphor"],
       ["Keybinds →", kbSummary],
