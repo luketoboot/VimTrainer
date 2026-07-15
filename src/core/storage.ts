@@ -24,6 +24,12 @@ export interface DailyRecord {
   submitted?: string; // initials it went to the leaderboard under, if it did
 }
 
+export interface UsageStats {
+  keys: Record<string, number>; // normal-mode token -> presses, across all runs
+  totalKeys: number; // every key in every context
+  runs: number;
+}
+
 export interface SaveData {
   version: number; // bump when a migration is needed (see read())
   settings: Settings;
@@ -31,6 +37,7 @@ export interface SaveData {
   stars: Record<string, number>; // levelId -> 0..3
   unlocked: Record<string, boolean>;
   daily?: DailyRecord; // today's (or the last played) daily attempt
+  stats?: UsageStats; // the player's long-term "Vim fingerprint"
 }
 
 const KEY = "vimtrainer.save.v1";
@@ -139,6 +146,15 @@ export const Storage = {
   setDaily(rec: DailyRecord): void {
     const d = read();
     d.daily = rec;
+    write(d);
+  },
+
+  getStats(): UsageStats | undefined {
+    return read().stats;
+  },
+  setStats(stats: UsageStats): void {
+    const d = read();
+    d.stats = stats;
     write(d);
   },
 };

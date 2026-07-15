@@ -17,6 +17,7 @@ import { Storage, type Settings } from "../core/storage.ts";
 import { isLevelUnlocked } from "../core/progression.ts";
 import { getPreset, type InsertEsc, type PresetId } from "../core/keybinds.ts";
 import { todayId } from "../core/daily.ts";
+import { categoryMix, emptyStats, fingerprintVerdict, neverUsed, topKeys } from "../core/stats.ts";
 
 export type ModeKey = "tutorial" | "rush" | "dodge" | "golf";
 
@@ -50,7 +51,7 @@ const MODES: ModeDef[] = [
   { key: "golf", title: "GOLF", subtitle: "transform text under a keystroke par", entries: GOLF_PUZZLES },
 ];
 
-type State = "mode" | "levels" | "settings" | "keybinds";
+type State = "mode" | "levels" | "settings" | "keybinds" | "stats";
 const SETTINGS_ROWS = ["volume", "music", "bloom", "screen", "scanlines", "theme", "coach", "keybinds", "back"] as const;
 
 // Rows of the keybinds sub-screen. Custom binds are appended dynamically.
@@ -116,11 +117,12 @@ export class MenuScreen {
     if (this.state === "mode") return this.handleMode(token);
     if (this.state === "levels") return this.handleLevels(token);
     if (this.state === "keybinds") return this.handleKeybinds(token);
+    if (this.state === "stats") return this.handleStats(token);
     return this.handleSettings(token);
   }
 
   private handleMode(token: KeyToken): MenuAction {
-    const total = MODES.length + 2; // + daily + settings
+    const total = MODES.length + 3; // + daily + stats + settings
     switch (token) {
       case "j":
       case "<Down>":
@@ -136,6 +138,8 @@ export class MenuScreen {
       case "<Right>":
         if (this.modeIndex === MODES.length) return { type: "daily" };
         if (this.modeIndex === MODES.length + 1) {
+          this.state = "stats";
+        } else if (this.modeIndex === MODES.length + 2) {
           this.state = "settings";
           this.settingsIndex = 0;
         } else {
@@ -146,6 +150,13 @@ export class MenuScreen {
       default:
         return { type: "none" };
     }
+  }
+
+  private handleStats(token: KeyToken): MenuAction {
+    if (token === "<Esc>" || token === "h" || token === "<Left>" || token === "<CR>" || token === "q") {
+      this.state = "mode";
+    }
+    return { type: "none" };
   }
 
   private handleLevels(token: KeyToken): MenuAction {
@@ -368,6 +379,7 @@ export class MenuScreen {
     if (this.state === "mode") this.renderMode();
     else if (this.state === "levels") this.renderLevels();
     else if (this.state === "keybinds") this.renderKeybinds();
+    else if (this.state === "stats") this.renderStats();
     else this.renderSettings();
   }
 
@@ -407,8 +419,13 @@ export class MenuScreen {
       { fg: playedToday ? th.accentAlt : th.dim },
     );
 
-    const setRow = dailyRow + 3;
-    const setSel = this.modeIndex === MODES.length + 1;
+    const statsRow = dailyRow + 3;
+    const statsSel = this.modeIndex === MODES.length + 1;
+    term.drawText(statsRow, 4, `${statsSel ? "▶ " : "  "}STATS`, { fg: statsSel ? th.accent : th.fg, bold: statsSel });
+    term.drawText(statsRow, 40, "your fingerprint", { fg: th.dim });
+
+    const setRow = statsRow + 2;
+    const setSel = this.modeIndex === MODES.length + 2;
     term.drawText(setRow, 4, `${setSel ? "▶ " : "  "}SETTINGS`, { fg: setSel ? th.accent : th.fg, bold: setSel });
 
     term.drawStatusLine(" j/k move   Enter select ", "VimTrainer ");
@@ -489,6 +506,53 @@ export class MenuScreen {
       term.drawText(row, 22, value, { fg: th.accentAlt });
     });
     term.drawStatusLine(" j/k move   h/l adjust   Enter toggle   Esc back ", "VimTrainer ");
+  }
+
+  private renderStats(): void {
+    const term = this.term;
+    const th = term.theme;
+    term.clear();
+    const stats = Storage.getStats() ?? emptyStats();
+
+    term.drawText(1, 4, "YOUR VIM FINGERPRINT", { fg: th.accent, bold: true });
+    term.drawText(2, 4, fingerprintVerdict(stats), { fg: th.dim });
+    term.drawText(3, 4, `${stats.runs} runs   ${stats.totalKeys} keys pressed`, { fg: th.statusFg });
+
+    // Top keys — bar chart.
+    const top = topKeys(stats, 7);
+    term.drawText(5, 4, "── most used ──", { fg: th.accentAlt });
+    const max = top[0]?.count ?? 1;
+    top.forEach((t, i) => {
+      const bar = "█".repeat(Math.max(1, Math.round((t.count / max) * 22)));
+      term.drawText(6 + i, 4, t.key.padEnd(7), { fg: th.fg, bold: true });
+      term.drawText(6 + i, 11, bar, { fg: th.accent });
+      term.drawText(6 + i, 34, String(t.count), { fg: th.dim });
+    });
+    if (top.length === 0) term.drawText(6, 4, "no keys recorded yet — go play!", { fg: th.dim });
+
+    // Category mix.
+    const mixRow = 6 + Math.max(1, top.length) + 1;
+    term.drawText(mixRow, 4, "── motion mix ──", { fg: th.accentAlt });
+    categoryMix(stats).forEach((c, i) => {
+      const pct = Math.round(c.share * 100);
+      const bar = "▰".repeat(Math.round(c.share * 16)).padEnd(16, "▱");
+      term.drawText(mixRow + 1 + i, 4, c.name.padEnd(20), { fg: th.statusFg });
+      term.drawText(mixRow + 1 + i, 24, bar, { fg: th.accentAlt });
+      term.drawText(mixRow + 1 + i, 42, `${pct}%`, { fg: th.dim });
+    });
+
+    // Untouched power tools — the coach's long-term voice.
+    const unusedRow = mixRow + 8;
+    const unused = neverUsed(stats);
+    if (stats.totalKeys >= 100 && unused.length > 0) {
+      term.drawText(unusedRow, 4, "── never touched ──", { fg: th.accentAlt });
+      term.drawText(unusedRow + 1, 4, unused.join("   ").slice(0, term.cols - 8), { fg: th.danger });
+      term.drawText(unusedRow + 2, 4, "each of these is a speed upgrade — try them in a run", { fg: th.dim });
+    } else if (stats.totalKeys >= 100) {
+      term.drawText(unusedRow, 4, "every power tool touched — nothing left on the table ★", { fg: th.accent });
+    }
+
+    term.drawStatusLine(" Esc back ", "VimTrainer ");
   }
 
   private renderKeybinds(): void {

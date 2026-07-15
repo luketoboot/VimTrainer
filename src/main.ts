@@ -10,6 +10,7 @@ import { MusicPlayer } from "./core/music.ts";
 import { fetchTop, initialsChar, submitScore, type BoardEntry } from "./core/leaderboard.ts";
 import { dailyLevel, dailyLevelId, seededRng, shareText, todayId } from "./core/daily.ts";
 import { Coach } from "./core/coach.ts";
+import { StatsTracker } from "./core/stats.ts";
 import { TerminalRenderer } from "./render/terminal.ts";
 import { AMBER_PHOSPHOR, GREEN_PHOSPHOR, scaledMetrics } from "./render/theme.ts";
 import { ScreenShake } from "./juice/shake.ts";
@@ -46,6 +47,7 @@ music.volume = settings.musicVolume;
 
 const coach = new Coach();
 coach.enabled = settings.coachTips;
+const stats = new StatsTracker();
 
 const services: GameServices = {
   term,
@@ -111,6 +113,11 @@ function dispatch(token: KeyToken): void {
     if (token === "<Esc>" && !(mode?.wantsEsc?.() ?? false)) {
       returnToMenu();
       return;
+    }
+    // Tally the fingerprint — real play only (replays and tutorial drills
+    // would skew it: one replays our keys, the other dictates yours).
+    if (mode && !(mode instanceof ReplayMode) && !lastLevelId.startsWith("tut-")) {
+      stats.record(token, mode.remapContext?.() ?? "normal");
     }
     mode?.handleKey(token);
   } else if (screen === "result" && result) {
@@ -272,6 +279,7 @@ function handleMenuAction(action: MenuAction): void {
 }
 
 function returnToMenu(): void {
+  stats.flush(); // bailed runs still count their keys
   screen = "menu";
   mode = null;
 }
@@ -292,6 +300,8 @@ function update(dt: number): void {
       if (!fromReplay) {
         if (result && result.stars >= 1) unlockNext(lastLevelIds, lastLevelId);
         resultSubmitted = ""; // fresh run — submission state resets
+        if (!lastLevelId.startsWith("tut-")) stats.recordRun();
+        stats.flush(); // persist the fingerprint at run boundaries
         // A finished daily locks in as today's one attempt.
         if (result && lastLevelId.startsWith("daily-")) {
           Storage.setDaily({

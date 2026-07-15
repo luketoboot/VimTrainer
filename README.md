@@ -55,6 +55,15 @@ Drop MP3s at `public/music/menu.mp3` (ambient menu loop) and
 automatically — crossfading between them as you enter/leave runs. No files, no
 music, no errors. Music volume has its own dial in settings.
 
+## Stats — your Vim fingerprint
+
+The **STATS** screen on the main menu shows what your hands actually do:
+every normal-mode key you press in a real run is tallied across sessions into
+a fingerprint — your most-used keys, your motion mix (steps / words / finds /
+jumps / edits / power), a verdict on your hjkl dependence, and the power
+tools you've **never touched**. Tutorial drills and replays don't count;
+they'd skew it.
+
 ## The habit coach
 
 While you play, a coach watches your keystream and calls out inefficient
