@@ -9,6 +9,7 @@ import type { ParticlePool } from "../juice/particles.ts";
 import type { Flash } from "../juice/flash.ts";
 import type { HitStop } from "../juice/hitstop.ts";
 import type { AudioFx } from "../juice/audio.ts";
+import type { Coach } from "../core/coach.ts";
 
 export interface GameServices {
   term: TerminalRenderer;
@@ -17,6 +18,7 @@ export interface GameServices {
   flash: Flash;
   hitstop: HitStop;
   audio: AudioFx;
+  coach: Coach;
 }
 
 export interface ModeResult {

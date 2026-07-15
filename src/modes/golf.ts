@@ -44,6 +44,7 @@ export class GolfMode implements GameMode {
 
   handleKey(token: KeyToken): void {
     if (this.done) return;
+    this.svc.coach.observe(token, this.remapContext());
     this.lastKey = token;
     this.keystrokes++;
     const events = this.engine.feedKey(token);

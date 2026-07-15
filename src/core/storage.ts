@@ -12,6 +12,7 @@ export interface Settings {
   theme: "green" | "amber";
   keybinds: KeybindSettings;
   initials: string; // last leaderboard initials, prefilled on submit
+  coachTips: boolean; // habit-coach toasts during play
 }
 
 export interface DailyRecord {
@@ -45,6 +46,7 @@ const DEFAULT: SaveData = {
     theme: "green",
     keybinds: { ...DEFAULT_KEYBINDS },
     initials: "",
+    coachTips: true,
   },
   highScores: {},
   stars: {},

@@ -9,6 +9,7 @@ import { KeyRemapper } from "./core/keybinds.ts";
 import { MusicPlayer } from "./core/music.ts";
 import { fetchTop, initialsChar, submitScore, type BoardEntry } from "./core/leaderboard.ts";
 import { dailyLevel, dailyLevelId, seededRng, shareText, todayId } from "./core/daily.ts";
+import { Coach } from "./core/coach.ts";
 import { TerminalRenderer } from "./render/terminal.ts";
 import { AMBER_PHOSPHOR, GREEN_PHOSPHOR, scaledMetrics } from "./render/theme.ts";
 import { ScreenShake } from "./juice/shake.ts";
@@ -43,6 +44,9 @@ audio.volume = settings.volume;
 const music = new MusicPlayer();
 music.volume = settings.musicVolume;
 
+const coach = new Coach();
+coach.enabled = settings.coachTips;
+
 const services: GameServices = {
   term,
   shake: new ScreenShake(),
@@ -50,6 +54,7 @@ const services: GameServices = {
   flash: new Flash(),
   hitstop: new HitStop(),
   audio,
+  coach,
 };
 
 const menu = new MenuScreen(term, settings);
@@ -229,6 +234,7 @@ function handleMenuAction(action: MenuAction): void {
     lastLevelIds = [];
     lastLevelId = level.id;
     mode = new DodgeMode(services, level, seededRng(today));
+    coach.reset();
     mode.init();
     screen = "playing";
     return;
@@ -236,6 +242,7 @@ function handleMenuAction(action: MenuAction): void {
   if (action.type === "settingsChanged") {
     audio.volume = settings.volume;
     music.volume = settings.musicVolume;
+    coach.enabled = settings.coachTips;
     term.theme = settings.theme === "amber" ? AMBER_PHOSPHOR : GREEN_PHOSPHOR;
     fit(); // screen-size dial changes the metrics — resize live
     Storage.setSettings(settings);
@@ -259,6 +266,7 @@ function handleMenuAction(action: MenuAction): void {
     lastLevelId = action.puzzle.id;
     mode = new GolfMode(services, action.puzzle);
   }
+  coach.reset();
   mode.init();
   screen = "playing";
 }
@@ -275,6 +283,7 @@ function update(dt: number): void {
   services.flash.update(dt);
 
   if (screen === "playing" && mode) {
+    coach.update(dt);
     const frozen = services.hitstop.tick(dt);
     if (!frozen) mode.update(dt);
     if (mode.done) {
@@ -310,6 +319,13 @@ function render(): void {
   if (screen === "menu") menu.render();
   else if (screen === "playing" && mode) mode.render();
   else if (screen === "result" && result) renderResult(result);
+
+  // Habit-coach toast: one short lesson at a time, above the statusline.
+  if (screen === "playing" && coach.current) {
+    const text = ` ⚡ ${coach.current} `.slice(0, term.cols);
+    const col = Math.max(0, Math.floor((term.cols - text.length) / 2));
+    term.drawText(term.rows - 1, col, text, { fg: term.theme.accent, bg: term.theme.statusBg, bold: true });
+  }
 
   // Tiny music state indicator (menu only): ♪ = playing, ♪0 = muted in
   // settings, ♪✕ = should play but isn't. Makes silence diagnosable at a glance.

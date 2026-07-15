@@ -13,6 +13,7 @@ function stubServices(): GameServices {
     flash: { trigger() {} } as unknown as GameServices["flash"],
     hitstop: {} as unknown as GameServices["hitstop"],
     audio: { play() {} } as unknown as GameServices["audio"],
+    coach: { observe() {}, reset() {}, update() {} } as unknown as GameServices["coach"],
   };
 }
 

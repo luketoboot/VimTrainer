@@ -55,6 +55,16 @@ Drop MP3s at `public/music/menu.mp3` (ambient menu loop) and
 automatically — crossfading between them as you enter/leave runs. No files, no
 music, no errors. Music volume has its own dial in settings.
 
+## The habit coach
+
+While you play, a coach watches your keystream and calls out inefficient
+habits with one short tip at a time — `7×l is a crawl — f{char} lands in one
+hop`, `4×w — a count does that in one: 4w`, `you retyped fq — ; repeats your
+last find`, `x-x-x-x — dw eats a whole word`. Per-habit and global cooldowns
+keep it teaching instead of nagging; insert-mode typing never counts. Toggle
+in settings ("Coach tips"). The tutorial is exempt — its drills ask for
+repeated keys on purpose.
+
 ## Daily Gauntlet
 
 One date-seeded Dodge run per day — the RNG is seeded from the UTC date, so

@@ -145,6 +145,7 @@ export class DodgeMode implements GameMode {
 
   handleKey(token: KeyToken): void {
     if (this.done) return;
+    this.svc.coach.observe(token, this.remapContext());
     const prevKey = this.lastKey;
     this.lastKey = token;
 

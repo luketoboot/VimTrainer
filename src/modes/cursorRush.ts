@@ -64,6 +64,7 @@ export class CursorRushMode implements GameMode {
 
   handleKey(token: KeyToken): void {
     if (this.done) return;
+    this.svc.coach.observe(token, this.remapContext());
     this.lastKey = token;
     this.keysThisTarget++;
     this.totalKeys++;

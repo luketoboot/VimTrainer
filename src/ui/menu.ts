@@ -51,7 +51,7 @@ const MODES: ModeDef[] = [
 ];
 
 type State = "mode" | "levels" | "settings" | "keybinds";
-const SETTINGS_ROWS = ["volume", "music", "bloom", "screen", "scanlines", "theme", "keybinds", "back"] as const;
+const SETTINGS_ROWS = ["volume", "music", "bloom", "screen", "scanlines", "theme", "coach", "keybinds", "back"] as const;
 
 // Rows of the keybinds sub-screen. Custom binds are appended dynamically.
 type KbRow =
@@ -245,6 +245,10 @@ export class MenuScreen {
     }
     if (row === "theme") {
       this.settings.theme = this.settings.theme === "green" ? "amber" : "green";
+      return { type: "settingsChanged" };
+    }
+    if (row === "coach") {
+      this.settings.coachTips = token === "<CR>" || token === "<Space>" ? !this.settings.coachTips : dir > 0;
       return { type: "settingsChanged" };
     }
     if (row === "keybinds" && dir > 0) {
@@ -474,6 +478,7 @@ export class MenuScreen {
       ["Screen size", `${Math.round(this.settings.screenScale * 100)}%   ${bar((this.settings.screenScale - 0.7) / 0.8)}`],
       ["Scanlines", this.settings.scanlines ? "ON" : "OFF"],
       ["Theme", this.settings.theme === "green" ? "GREEN phosphor" : "AMBER phosphor"],
+      ["Coach tips", this.settings.coachTips ? "ON" : "OFF"],
       ["Keybinds →", kbSummary],
       ["← Back", ""],
     ];
