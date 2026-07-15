@@ -88,10 +88,8 @@ export class DodgeMode implements GameMode {
   private floaters: Floater[] = [];
   private pickupTimer = 6; // seconds until the next collectible drops
 
-  // Mastery: big motions build juice + a leap combo.
+  // Mastery: big motions get a juice burst (no score — see onLeap).
   private leaps = 0;
-  private leapCombo = 0;
-  private leapTimer = 0; // combo decays if you go too long without a leap
 
   // Feel: grazing charges a bomb you spend with `dd` to clear the screen.
   private bomb = 0; // 0..1 charge
@@ -181,11 +179,6 @@ export class DodgeMode implements GameMode {
     this.elapsed += dt;
     this.blink += dt;
     if (this.invuln > 0) this.invuln = Math.max(0, this.invuln - dt);
-    if (this.leapTimer > 0) {
-      this.leapTimer = Math.max(0, this.leapTimer - dt);
-      if (this.leapTimer === 0) this.leapCombo = 0; // combo cooled off
-    }
-
     const difficulty = Math.min(1, this.elapsed / this.level.duration);
 
     // Spawning.
@@ -484,23 +477,19 @@ export class DodgeMode implements GameMode {
   }
 
   // --- mastery: big-motion leaps ---
+  // Leaps are pure juice, deliberately worth zero points: a score bonus here
+  // was farmable by bouncing gg/G/w in a safe corner. The real reward for big
+  // motions is survival — points come only from risk (grazes, pickups, time).
 
   private onLeap(dist: number): void {
-    this.leapCombo++;
-    this.leapTimer = 2.5; // window to keep the combo alive
     this.leaps++;
-    const bonus = Math.round(dist * 2 * (1 + (this.leapCombo - 1) * 0.25));
-    this.score += bonus;
-    const th = this.svc.term.theme;
-    const label = this.leapCombo > 1 ? `+${bonus} LEAP x${this.leapCombo}` : `+${bonus} LEAP`;
-    this.pushFloater(this.engine.cursor.col, this.engine.cursor.row, label, th.accent);
     const px = pixelForCell(this.svc.term, this.engine.cursor.col, this.engine.cursor.row);
     this.svc.particles.burst(px.x, px.y, {
-      color: th.accent,
-      count: Math.min(24, 6 + dist * 2),
-      speed: 160,
+      color: this.svc.term.theme.accent,
+      count: Math.min(18, 6 + dist),
+      speed: 150,
     });
-    this.svc.audio.play(this.leapCombo > 2 ? "combo" : "land");
+    this.svc.audio.play("land");
   }
 
   // --- feel: the graze-charged bomb ---
@@ -669,9 +658,8 @@ export class DodgeMode implements GameMode {
     const filled = Math.round(this.bomb * 5);
     const bombLabel =
       this.bomb >= 1 ? "BOMB:dd" : `bomb ${"▮".repeat(filled)}${"▯".repeat(5 - filled)}`;
-    const combo = this.leapCombo > 1 ? `  LEAP x${this.leapCombo}` : "";
     term.drawStatusLine(
-      ` ${this.level.title}   ${hearts}   ⏱ ${timeLeft}s${combo}`,
+      ` ${this.level.title}   ${hearts}   ⏱ ${timeLeft}s`,
       `${bombLabel}   score ${this.score} `,
     );
   }

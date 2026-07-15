@@ -40,8 +40,9 @@ to go back). Levels unlock as you clear the previous one (earn ≥1 star).
   levels from First Contact to Bullet Storm. Dense onscreen blooms (rings, spirals,
   walls) are **telegraphed** first so deaths feel earned. **Grazing** bullets charges
   a bomb you spend with `dd` to clear the screen. Big motions (`gg`/`G`/`$`/`w`/`f`)
-  register as **leaps** — bonus score, a combo, and extra juice, so mastering the fast
-  motions literally pays off. **★ pickups** drop across the field to reward seeking
+  register as **leaps** — a burst of juice, worth zero points (a score bonus was
+  farmable by bouncing gg/G in a corner; points come only from risk: grazes,
+  pickups, survival time). **★ pickups** drop across the field to reward seeking
   them out with a motion. HP + i-frames + near-miss scoring. The field is read-only —
   any edit (other than the `dd` bomb) is snapped back, so only motions matter.
 - **Golf** — transform the start buffer into the target buffer under a keystroke

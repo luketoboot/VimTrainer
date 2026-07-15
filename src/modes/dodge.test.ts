@@ -109,14 +109,21 @@ describe("DodgeMode", () => {
     expect(diagonal.length).toBeGreaterThan(0);
   });
 
-  it("a big motion is rewarded as a leap (score + leap count)", () => {
+  it("a big motion counts as a leap but grants NO score (not farmable)", () => {
     const mode = new DodgeMode(stubServices(), LEVEL);
     mode.init();
     const g = peek(mode);
     expect(g.leaps).toBe(0);
     mode.handleKey("G"); // jump to the last line — a long vertical move
     expect(g.leaps).toBe(1);
-    expect(g.score).toBeGreaterThan(0);
+    expect(g.score).toBe(0); // juice only — score comes from risk, not motion
+    // Hammering big motions still earns nothing.
+    for (let i = 0; i < 20; i++) {
+      mode.handleKey("g");
+      mode.handleKey("g");
+      mode.handleKey("G");
+    }
+    expect(g.score).toBe(0);
   });
 
   it("a charged bomb fires on `dd` and clears the field", () => {
