@@ -16,6 +16,10 @@ interface Rating {
   color: string;
 }
 
+// Grid row where the buffer starts — rows 0/1 belong to the hint bar and the
+// rating popup, which would otherwise draw on top of the buffer's first line.
+const PLAYFIELD_ROW = 2;
+
 export class CursorRushMode implements GameMode {
   private svc: GameServices;
   private level: CursorRushLevel;
@@ -112,7 +116,7 @@ export class CursorRushMode implements GameMode {
     this.ratingFade = 1;
 
     // Juice: burst at the landing cell, flash, a touch of shake on big combos.
-    const px = this.svc.term.gridToPixel(this.target.row, this.target.col);
+    const px = this.svc.term.gridToPixel(this.target.row + PLAYFIELD_ROW, this.target.col);
     this.svc.particles.burst(px.x, px.y, {
       color: rating.color,
       count: rating.label === "PERFECT" ? 22 : 12,
@@ -236,6 +240,7 @@ export class CursorRushMode implements GameMode {
     term.clear();
     drawBuffer(term, this.engine.getView(), {
       dimText: true,
+      screenRow: PLAYFIELD_ROW,
       highlights: [{ pos: this.target, bg: term.theme.accent }],
     });
 

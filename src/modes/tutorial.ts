@@ -6,6 +6,7 @@ import { VimEngine, tokenize } from "../engine/engine.ts";
 import type { KeyToken } from "../engine/keymap.ts";
 import type { Pos } from "../engine/types.ts";
 import { drawBuffer } from "../render/bufferView.ts";
+import { wrapText } from "../render/text.ts";
 import type { Lesson, TutorialChapter } from "../levels/tutorial.ts";
 import { Storage } from "../core/storage.ts";
 import { unlockNext } from "../core/progression.ts";
@@ -14,27 +15,6 @@ import { contextForEngine, engineWantsEsc, type RemapContext } from "../core/key
 import type { GameMode, GameServices, ModeResult } from "./mode.ts";
 
 /** Run keys on a scratch engine and report the resulting cursor (for reach targets). */
-/** Greedy word-wrap capped at maxLines (last line ellipsized if truncated). */
-function wrapText(text: string, width: number, maxLines: number): string[] {
-  const words = text.split(/\s+/).filter(Boolean);
-  const lines: string[] = [];
-  let cur = "";
-  for (const w of words) {
-    if (cur.length + w.length + 1 > width && cur) {
-      lines.push(cur);
-      cur = w;
-    } else {
-      cur = cur ? `${cur} ${w}` : w;
-    }
-  }
-  if (cur) lines.push(cur);
-  if (lines.length > maxLines) {
-    lines.length = maxLines;
-    lines[maxLines - 1] = lines[maxLines - 1]!.slice(0, width - 1) + "…";
-  }
-  return lines;
-}
-
 export function computeReach(lesson: Lesson): Pos {
   const e = new VimEngine();
   e.load(lesson.buffer, lesson.cursor);

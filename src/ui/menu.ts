@@ -4,6 +4,7 @@
 
 import type { KeyToken } from "../engine/keymap.ts";
 import type { TerminalRenderer } from "../render/terminal.ts";
+import { wrapText } from "../render/text.ts";
 import {
   CURSOR_RUSH_LEVELS,
   DODGE_LEVELS,
@@ -514,42 +515,62 @@ export class MenuScreen {
     term.clear();
     const stats = Storage.getStats() ?? emptyStats();
 
-    term.drawText(1, 4, "YOUR VIM FINGERPRINT", { fg: th.accent, bold: true });
-    term.drawText(2, 4, fingerprintVerdict(stats), { fg: th.dim });
-    term.drawText(3, 4, `${stats.runs} runs   ${stats.totalKeys} keys pressed`, { fg: th.statusFg });
+    // Everything wraps/scales to the grid width so no line runs off-screen.
+    const left = 4;
+    const width = Math.max(20, term.cols - left * 2);
+    let row = 1;
 
-    // Top keys — bar chart.
+    term.drawText(row++, left, "YOUR VIM FINGERPRINT", { fg: th.accent, bold: true });
+    for (const line of wrapText(fingerprintVerdict(stats), width, 2)) {
+      term.drawText(row++, left, line, { fg: th.dim });
+    }
+    term.drawText(row++, left, `${stats.runs} runs   ${stats.totalKeys} keys pressed`, { fg: th.statusFg });
+    row++;
+
+    // Top keys — bar chart sized so bar + count end inside the grid.
     const top = topKeys(stats, 7);
-    term.drawText(5, 4, "── most used ──", { fg: th.accentAlt });
+    term.drawText(row++, left, "── most used ──", { fg: th.accentAlt });
     const max = top[0]?.count ?? 1;
-    top.forEach((t, i) => {
-      const bar = "█".repeat(Math.max(1, Math.round((t.count / max) * 22)));
-      term.drawText(6 + i, 4, t.key.padEnd(7), { fg: th.fg, bold: true });
-      term.drawText(6 + i, 11, bar, { fg: th.accent });
-      term.drawText(6 + i, 34, String(t.count), { fg: th.dim });
+    const barCol = left + 7;
+    const barMax = Math.max(6, Math.min(22, term.cols - barCol - String(max).length - left - 1));
+    top.forEach((t) => {
+      const bar = "█".repeat(Math.max(1, Math.round((t.count / max) * barMax)));
+      term.drawText(row, left, t.key.padEnd(7).slice(0, 7), { fg: th.fg, bold: true });
+      term.drawText(row, barCol, bar, { fg: th.accent });
+      term.drawText(row, barCol + barMax + 1, String(t.count), { fg: th.dim });
+      row++;
     });
-    if (top.length === 0) term.drawText(6, 4, "no keys recorded yet — go play!", { fg: th.dim });
+    if (top.length === 0) term.drawText(row++, left, "no keys recorded yet — go play!", { fg: th.dim });
+    row++;
 
-    // Category mix.
-    const mixRow = 6 + Math.max(1, top.length) + 1;
-    term.drawText(mixRow, 4, "── motion mix ──", { fg: th.accentAlt });
-    categoryMix(stats).forEach((c, i) => {
+    // Category mix — label + meter + percent, columns derived from the width.
+    term.drawText(row++, left, "── motion mix ──", { fg: th.accentAlt });
+    const mixBarW = Math.max(6, Math.min(16, term.cols - left - 20 - 6 - left));
+    const mixNameW = Math.min(20, Math.max(10, term.cols - left - mixBarW - 6 - left));
+    categoryMix(stats).forEach((c) => {
       const pct = Math.round(c.share * 100);
-      const bar = "▰".repeat(Math.round(c.share * 16)).padEnd(16, "▱");
-      term.drawText(mixRow + 1 + i, 4, c.name.padEnd(20), { fg: th.statusFg });
-      term.drawText(mixRow + 1 + i, 24, bar, { fg: th.accentAlt });
-      term.drawText(mixRow + 1 + i, 42, `${pct}%`, { fg: th.dim });
+      const bar = "▰".repeat(Math.round(c.share * mixBarW)).padEnd(mixBarW, "▱");
+      term.drawText(row, left, c.name.slice(0, mixNameW).padEnd(mixNameW), { fg: th.statusFg });
+      term.drawText(row, left + mixNameW, bar, { fg: th.accentAlt });
+      term.drawText(row, left + mixNameW + mixBarW + 2, `${pct}%`, { fg: th.dim });
+      row++;
     });
+    row++;
 
     // Untouched power tools — the coach's long-term voice.
-    const unusedRow = mixRow + 8;
     const unused = neverUsed(stats);
     if (stats.totalKeys >= 100 && unused.length > 0) {
-      term.drawText(unusedRow, 4, "── never touched ──", { fg: th.accentAlt });
-      term.drawText(unusedRow + 1, 4, unused.join("   ").slice(0, term.cols - 8), { fg: th.danger });
-      term.drawText(unusedRow + 2, 4, "each of these is a speed upgrade — try them in a run", { fg: th.dim });
+      term.drawText(row++, left, "── never touched ──", { fg: th.accentAlt });
+      for (const line of wrapText(unused.join("   "), width, 2)) {
+        term.drawText(row++, left, line, { fg: th.danger });
+      }
+      for (const line of wrapText("each of these is a speed upgrade — try them in a run", width, 2)) {
+        term.drawText(row++, left, line, { fg: th.dim });
+      }
     } else if (stats.totalKeys >= 100) {
-      term.drawText(unusedRow, 4, "every power tool touched — nothing left on the table ★", { fg: th.accent });
+      for (const line of wrapText("every power tool touched — nothing left on the table ★", width, 2)) {
+        term.drawText(row++, left, line, { fg: th.accent });
+      }
     }
 
     term.drawStatusLine(" Esc back ", "VimTrainer ");

@@ -53,6 +53,11 @@ interface Floater {
 const TELEGRAPH_DELAY = 0.75; // seconds of warning before a bloom fires
 const LEAP_DISTANCE = 3; // cells moved in one key to count as a mastery "leap"
 
+// Grid row where the playfield starts — row 0 is the hint bar, which would
+// otherwise draw on top of the backdrop's first line. Game logic stays in
+// field space (0..rows-1); only rendering applies this offset.
+const PLAYFIELD_ROW = 1;
+
 const BACKDROP_POOL = [
   "const engine = require('vim'); // stay sharp and keep moving through the noise",
   "function survive() { while (alive) { dodge(); read(lanes); reposition(fast); } }",
@@ -616,7 +621,7 @@ export class DodgeMode implements GameMode {
     term.clear();
     const th = term.theme;
     // Backdrop, dim, no cursor (we draw our own so it can blink during i-frames).
-    drawBuffer(term, this.engine.getView(), { dimText: true, showCursor: false });
+    drawBuffer(term, this.engine.getView(), { dimText: true, showCursor: false, screenRow: PLAYFIELD_ROW });
 
     // Telegraphs: pulse a warning glyph on cells a bloom is about to occupy,
     // blinking faster as the moment of fire approaches.
@@ -624,26 +629,26 @@ export class DodgeMode implements GameMode {
       const rate = t.timer < 0.3 ? 16 : 7;
       const hot = Math.floor(this.blink * rate) % 2 === 0;
       for (const c of t.cells) {
-        term.drawGlyphAtCell(c.x, c.y, hot ? "▓" : "░", hot ? th.danger : th.dim, true);
+        term.drawGlyphAtCell(c.x, c.y + PLAYFIELD_ROW, hot ? "▓" : "░", hot ? th.danger : th.dim, true);
       }
     }
 
     // Pickups: a star to seek out; blinks as it's about to fade.
     for (const pk of this.pickups) {
       const fading = pk.ttl < 1.5 && Math.floor(this.blink * 10) % 2 === 0;
-      if (!fading) term.drawGlyphAtCell(pk.x, pk.y, "★", th.accentAlt, true);
+      if (!fading) term.drawGlyphAtCell(pk.x, pk.y + PLAYFIELD_ROW, "★", th.accentAlt, true);
     }
 
     // Projectiles.
     for (const p of this.projectiles) {
-      term.drawGlyphAtCell(p.x, p.y, p.glyph, p.color, true);
+      term.drawGlyphAtCell(p.x, p.y + PLAYFIELD_ROW, p.glyph, p.color, true);
     }
 
     // Cursor: bright block; blink while invulnerable.
     const visible = this.invuln <= 0 || Math.floor(this.blink * 12) % 2 === 0;
     if (visible) {
       const ch = this.engine.lines[this.engine.cursor.row]?.[this.engine.cursor.col] ?? " ";
-      term.drawGlyphAtCell(this.engine.cursor.col, this.engine.cursor.row, "▊", th.fg, true);
+      term.drawGlyphAtCell(this.engine.cursor.col, this.engine.cursor.row + PLAYFIELD_ROW, "▊", th.fg, true);
       void ch;
     }
 
@@ -703,6 +708,6 @@ function pixelForCell(
   const m = term.metrics;
   return {
     x: m.padding + xCell * m.cellW + m.cellW / 2,
-    y: m.padding + yCell * m.cellH + m.cellH / 2,
+    y: m.padding + (yCell + PLAYFIELD_ROW) * m.cellH + m.cellH / 2,
   };
 }
