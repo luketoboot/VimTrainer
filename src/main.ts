@@ -17,6 +17,7 @@ import { HitStop } from "./juice/hitstop.ts";
 import { AudioFx } from "./juice/audio.ts";
 import { MenuScreen, type MenuAction } from "./ui/menu.ts";
 import { CursorRushMode } from "./modes/cursorRush.ts";
+import { ReplayMode } from "./modes/replay.ts";
 import { DodgeMode } from "./modes/dodge.ts";
 import { GolfMode } from "./modes/golf.ts";
 import { TutorialMode } from "./modes/tutorial.ts";
@@ -24,6 +25,7 @@ import {
   CURSOR_RUSH_LEVELS,
   DODGE_LEVELS,
   GOLF_PUZZLES,
+  getGolfPuzzle,
 } from "./levels/curriculum.ts";
 import { TUTORIAL_CHAPTERS } from "./levels/tutorial.ts";
 import type { GameMode, GameServices, ModeResult } from "./modes/mode.ts";
@@ -116,6 +118,13 @@ function handleResultKey(token: KeyToken, r: ModeResult): void {
       resultPhase = { kind: "initials", slots: settings.initials.slice(0, 3), sending: false };
     } else if (token === "l" || token === "L") {
       openBoard(r.levelId);
+    } else if (token === "r" || token === "R") {
+      const puzzle = getGolfPuzzle(r.levelId);
+      if (puzzle) {
+        mode = new ReplayMode(services, puzzle, r);
+        mode.init();
+        screen = "playing";
+      }
     } else if (token === "<CR>" || token === "<Space>" || token === "<Esc>") {
       returnToMenu();
     }
@@ -234,10 +243,13 @@ function update(dt: number): void {
     const frozen = services.hitstop.tick(dt);
     if (!frozen) mode.update(dt);
     if (mode.done) {
+      const fromReplay = mode instanceof ReplayMode;
       result = mode.getResult();
-      if (result && result.stars >= 1) unlockNext(lastLevelIds, lastLevelId);
+      if (!fromReplay) {
+        if (result && result.stars >= 1) unlockNext(lastLevelIds, lastLevelId);
+        resultSubmitted = ""; // fresh run — submission state resets
+      }
       resultPhase = { kind: "summary" };
-      resultSubmitted = "";
       screen = "result";
       mode = null;
     }
@@ -287,6 +299,7 @@ function renderResult(r: ModeResult): void {
       ...(canSubmit(r) && !resultSubmitted ? ["s — submit score"] : []),
       ...(resultSubmitted ? [`submitted as ${resultSubmitted}`] : []),
       "l — leaderboard",
+      ...(getGolfPuzzle(r.levelId) ? ["r — watch par"] : []),
     ].join("   ");
     term.drawText(8 + r.lines.length + 2, center(actions.length), actions, { fg: th.statusFg });
   } else if (ph.kind === "initials") {

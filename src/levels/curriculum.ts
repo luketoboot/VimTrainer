@@ -248,12 +248,15 @@ export interface GolfPuzzle {
   start: string[];
   target: string[];
   par: number; // keystroke par (Esc counts, like real vimgolf)
+  /** Canonical par solution, replayable key-by-key. Verified by test. */
+  solution: string;
   startCursor?: { row: number; col: number };
 }
 
 export const GOLF_PUZZLES: GolfPuzzle[] = [
   {
     id: "golf-delete-line",
+    solution: "dd",
     title: "Tidy Up",
     skill: "Line delete (dd)",
     hint: "Remove the debug line. Think dd.",
@@ -264,6 +267,7 @@ export const GOLF_PUZZLES: GolfPuzzle[] = [
   },
   {
     id: "golf-swap-word",
+    solution: "ciwbar<Esc>",
     title: "Rename",
     skill: "Change word (ciw / cw)",
     hint: "Turn foo into bar. ciw is your friend.",
@@ -274,6 +278,7 @@ export const GOLF_PUZZLES: GolfPuzzle[] = [
   },
   {
     id: "golf-quote",
+    solution: "ci\"hello<Esc>",
     title: "Quote It",
     skill: "Change inside quotes (ci\")",
     hint: 'Replace the placeholder text between the quotes with hello.',
@@ -284,6 +289,7 @@ export const GOLF_PUZZLES: GolfPuzzle[] = [
   },
   {
     id: "golf-args",
+    solution: "ci(a, b<Esc>",
     title: "Swap the Guts",
     skill: "Change inside parens (ci()",
     hint: "Change the args inside ( ) to a, b. Try ci(.",
@@ -294,6 +300,7 @@ export const GOLF_PUZZLES: GolfPuzzle[] = [
   },
   {
     id: "golf-append",
+    solution: "A;<Esc>j.j.",
     title: "Semicolons",
     skill: "Append at end (A)",
     hint: "Add a semicolon to each line. A;<Esc> then j. and repeat, or . to repeat.",
@@ -304,6 +311,7 @@ export const GOLF_PUZZLES: GolfPuzzle[] = [
   },
   {
     id: "golf-reverse",
+    solution: "ddp",
     title: "Flip Order",
     skill: "Delete + paste (dd p)",
     hint: "Move the first line below the second. dd then p.",
@@ -314,6 +322,7 @@ export const GOLF_PUZZLES: GolfPuzzle[] = [
   },
   {
     id: "golf-empty-call",
+    solution: "di(",
     title: "Empty the Call",
     skill: "Delete inside parens (di()",
     hint: "Clear everything between the parentheses. di( does it in one move.",
@@ -324,6 +333,7 @@ export const GOLF_PUZZLES: GolfPuzzle[] = [
   },
   {
     id: "golf-dup",
+    solution: "yyp",
     title: "Twins",
     skill: "Yank + paste line (yy p)",
     hint: "Make a second, identical line. Yank it with yy, paste with p.",
@@ -334,6 +344,7 @@ export const GOLF_PUZZLES: GolfPuzzle[] = [
   },
   {
     id: "golf-substitute",
+    solution: ":s/a/b/g<CR>",
     title: "Find & Replace",
     skill: "Substitute (:s//g)",
     hint: "Replace every 'a' with 'b' at once. :s/a/b/g beats doing it by hand.",
@@ -344,6 +355,7 @@ export const GOLF_PUZZLES: GolfPuzzle[] = [
   },
   {
     id: "golf-block-strip",
+    solution: "<C-v>jjld",
     title: "Strip the Column",
     skill: "Visual block (Ctrl-V)",
     hint: "Delete the leading '# ' from every line with a visual block: Ctrl-V, select, d.",

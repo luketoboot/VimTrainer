@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import { GolfMode } from "./golf.ts";
 import type { GameServices } from "./mode.ts";
 import { GREEN_PHOSPHOR } from "../render/theme.ts";
-import { tokenize } from "../engine/engine.ts";
-import type { GolfPuzzle } from "../levels/curriculum.ts";
+import { VimEngine, tokenize } from "../engine/engine.ts";
+import { GOLF_PUZZLES, type GolfPuzzle } from "../levels/curriculum.ts";
 
 function stubServices(): GameServices {
   return {
@@ -34,6 +34,7 @@ const DELETE_LINE: GolfPuzzle = {
   start: ["a", "DEBUG", "b"],
   target: ["a", "b"],
   par: 3,
+  solution: "dd",
   startCursor: { row: 1, col: 0 },
 };
 
@@ -45,6 +46,7 @@ const SWAP_WORD: GolfPuzzle = {
   start: ["let foo = 42;"],
   target: ["let bar = 42;"],
   par: 8,
+  solution: "ciwbar<Esc>",
   startCursor: { row: 0, col: 4 },
 };
 
@@ -73,4 +75,19 @@ describe("GolfMode", () => {
     // c i w b a r -> buffer already reads the target after 'r' (6 keys), before <Esc>.
     expect(mode.getResult()!.score).toBe(6);
   });
+});
+
+describe("golf par solutions", () => {
+  // Every shipped puzzle's canonical solution must actually solve it at or
+  // under par — this is what the replay feature plays back.
+  for (const p of GOLF_PUZZLES) {
+    it(`${p.id}: "${p.solution}" solves it in <= par (${p.par})`, () => {
+      const e = new VimEngine();
+      e.load(p.start, p.startCursor ?? { row: 0, col: 0 });
+      const tokens = tokenize(p.solution);
+      for (const t of tokens) e.feedKey(t);
+      expect(e.getText()).toBe(p.target.join("\n"));
+      expect(tokens.length).toBeLessThanOrEqual(p.par);
+    });
+  }
 });
