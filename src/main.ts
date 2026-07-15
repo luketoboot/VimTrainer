@@ -8,6 +8,7 @@ import { unlockNext } from "./core/progression.ts";
 import { KeyRemapper } from "./core/keybinds.ts";
 import { MusicPlayer } from "./core/music.ts";
 import { fetchTop, initialsChar, submitScore, type BoardEntry } from "./core/leaderboard.ts";
+import { dailyLevel, dailyLevelId, seededRng, shareText, todayId } from "./core/daily.ts";
 import { TerminalRenderer } from "./render/terminal.ts";
 import { AMBER_PHOSPHOR, GREEN_PHOSPHOR, scaledMetrics } from "./render/theme.ts";
 import { ScreenShake } from "./juice/shake.ts";
@@ -65,6 +66,7 @@ type ResultPhase =
   | { kind: "board"; entries: BoardEntry[] | null; loading: boolean; note?: string };
 let resultPhase: ResultPhase = { kind: "summary" };
 let resultSubmitted = ""; // initials this run was submitted under ("" = not yet)
+let shareCopied = false; // transient "copied!" feedback on daily results
 
 function canSubmit(r: ModeResult): boolean {
   return r.score > 0 && !r.levelId.startsWith("tut-");
@@ -125,6 +127,12 @@ function handleResultKey(token: KeyToken, r: ModeResult): void {
         mode.init();
         screen = "playing";
       }
+    } else if ((token === "c" || token === "C") && r.levelId.startsWith("daily-")) {
+      const text = shareText(r.levelId.slice("daily-".length), r.score, r.stars, r.lines[1] ?? "");
+      void navigator.clipboard?.writeText(text).then(() => {
+        shareCopied = true;
+        services.audio.play("perfect");
+      });
     } else if (token === "<CR>" || token === "<Space>" || token === "<Esc>") {
       returnToMenu();
     }
@@ -155,7 +163,14 @@ async function doSubmit(r: ModeResult, ph: ResultPhase & { kind: "initials" }): 
   Storage.setSettings(settings);
   const ok = await submitScore(r.levelId, ph.slots, r.score);
   if (screen !== "result") return; // player already left — don't yank the screen
-  if (ok) resultSubmitted = ph.slots;
+  if (ok) {
+    resultSubmitted = ph.slots;
+    // Remember on the daily record so re-viewing it can't double-submit.
+    const rec = Storage.getDaily();
+    if (r.levelId.startsWith("daily-") && rec?.date === todayId()) {
+      Storage.setDaily({ ...rec, submitted: ph.slots });
+    }
+  }
   openBoard(r.levelId, ok ? undefined : "couldn't reach the leaderboard — score not sent");
 }
 
@@ -198,6 +213,26 @@ window.addEventListener("pointerdown", () => {
 });
 
 function handleMenuAction(action: MenuAction): void {
+  if (action.type === "daily") {
+    const today = todayId();
+    const rec = Storage.getDaily();
+    if (rec?.date === today) {
+      // Already played — re-show the result screen (board + share still work).
+      result = { levelId: dailyLevelId(today), title: rec.title, score: rec.score, stars: rec.stars, lines: rec.lines };
+      resultPhase = { kind: "summary" };
+      resultSubmitted = rec.submitted ?? "";
+      shareCopied = false;
+      screen = "result";
+      return;
+    }
+    const level = dailyLevel(today);
+    lastLevelIds = [];
+    lastLevelId = level.id;
+    mode = new DodgeMode(services, level, seededRng(today));
+    mode.init();
+    screen = "playing";
+    return;
+  }
   if (action.type === "settingsChanged") {
     audio.volume = settings.volume;
     music.volume = settings.musicVolume;
@@ -248,8 +283,19 @@ function update(dt: number): void {
       if (!fromReplay) {
         if (result && result.stars >= 1) unlockNext(lastLevelIds, lastLevelId);
         resultSubmitted = ""; // fresh run — submission state resets
+        // A finished daily locks in as today's one attempt.
+        if (result && lastLevelId.startsWith("daily-")) {
+          Storage.setDaily({
+            date: todayId(),
+            title: result.title,
+            score: result.score,
+            stars: result.stars,
+            lines: result.lines,
+          });
+        }
       }
       resultPhase = { kind: "summary" };
+      shareCopied = false;
       screen = "result";
       mode = null;
     }
@@ -300,6 +346,7 @@ function renderResult(r: ModeResult): void {
       ...(resultSubmitted ? [`submitted as ${resultSubmitted}`] : []),
       "l — leaderboard",
       ...(getGolfPuzzle(r.levelId) ? ["r — watch par"] : []),
+      ...(r.levelId.startsWith("daily-") ? [shareCopied ? "copied ✓" : "c — share"] : []),
     ].join("   ");
     term.drawText(8 + r.lines.length + 2, center(actions.length), actions, { fg: th.statusFg });
   } else if (ph.kind === "initials") {

@@ -14,12 +14,22 @@ export interface Settings {
   initials: string; // last leaderboard initials, prefilled on submit
 }
 
+export interface DailyRecord {
+  date: string; // YYYY-MM-DD (UTC)
+  title: string;
+  score: number;
+  stars: number;
+  lines: string[]; // result-screen summary, so it can be re-shown later
+  submitted?: string; // initials it went to the leaderboard under, if it did
+}
+
 export interface SaveData {
   version: number; // bump when a migration is needed (see read())
   settings: Settings;
   highScores: Record<string, number>; // levelId -> best score
   stars: Record<string, number>; // levelId -> 0..3
   unlocked: Record<string, boolean>;
+  daily?: DailyRecord; // today's (or the last played) daily attempt
 }
 
 const KEY = "vimtrainer.save.v1";
@@ -118,6 +128,15 @@ export const Storage = {
   unlock(levelId: string): void {
     const d = read();
     d.unlocked[levelId] = true;
+    write(d);
+  },
+
+  getDaily(): DailyRecord | undefined {
+    return read().daily;
+  },
+  setDaily(rec: DailyRecord): void {
+    const d = read();
+    d.daily = rec;
     write(d);
   },
 };

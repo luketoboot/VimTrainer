@@ -81,7 +81,7 @@ export class DodgeMode implements GameMode {
   private blink = 0;
   private lastKey = "";
   private survived = false;
-  private spiralPhase = Math.random() * Math.PI * 2; // rotating-emitter angle
+  private spiralPhase = 0; // rotating-emitter angle, seeded in init()
 
   private telegraphs: Telegraph[] = [];
   private pickups: Pickup[] = [];
@@ -100,13 +100,19 @@ export class DodgeMode implements GameMode {
   done = false;
   private result: ModeResult | null = null;
 
-  constructor(svc: GameServices, level: DodgeLevel) {
+  /** All gameplay randomness flows through `rand`, so a seeded rng makes the
+   *  whole run deterministic — the daily challenge gives everyone the same waves. */
+  private rand: () => number;
+
+  constructor(svc: GameServices, level: DodgeLevel, rng: () => number = Math.random) {
     this.svc = svc;
     this.level = level;
     this.hp = level.startHp;
+    this.rand = rng;
   }
 
   init(): void {
+    this.spiralPhase = this.rand() * Math.PI * 2;
     this.cols = Math.max(20, this.svc.term.cols);
     this.rows = Math.max(8, this.svc.term.rows - 2); // leave HUD + statusline
     this.buildBackdrop();
@@ -186,7 +192,7 @@ export class DodgeMode implements GameMode {
     if (this.spawnTimer <= 0) {
       this.spawnWave(difficulty);
       const interval = lerp(this.level.baseSpawnInterval, this.level.minSpawnInterval, difficulty);
-      this.spawnTimer = interval * (0.7 + Math.random() * 0.6);
+      this.spawnTimer = interval * (0.7 + this.rand() * 0.6);
     }
 
     // Telegraphs: warn, then bloom.
@@ -269,10 +275,10 @@ export class DodgeMode implements GameMode {
     const speed = lerp(this.level.baseSpeed, this.level.maxSpeed, difficulty);
     // Denser late-game: fire more patterns per tick as difficulty ramps in.
     const intensity = this.level.intensity ?? 0;
-    const extra = Math.floor(difficulty * intensity + Math.random() * 0.5);
+    const extra = Math.floor(difficulty * intensity + this.rand() * 0.5);
     const waves = 1 + Math.max(0, extra);
     for (let w = 0; w < waves; w++) {
-      const pattern = this.level.patterns[Math.floor(Math.random() * this.level.patterns.length)]!;
+      const pattern = this.level.patterns[Math.floor(this.rand() * this.level.patterns.length)]!;
       this.emit(pattern, speed, difficulty);
     }
   }
@@ -280,7 +286,7 @@ export class DodgeMode implements GameMode {
   // Dense onscreen blooms get a telegraph so they're readable; edge-fed patterns
   // (streams, rain, aimed, diagonal, arc) come from offscreen and fire at once.
   private emit(pattern: DodgePattern, speed: number, difficulty: number): void {
-    const rint = (n: number): number => Math.floor(Math.random() * n);
+    const rint = (n: number): number => Math.floor(this.rand() * n);
     switch (pattern) {
       case "ring": {
         const ox = 3 + rint(Math.max(1, this.cols - 6));
@@ -312,7 +318,7 @@ export class DodgeMode implements GameMode {
 
   private spawn(pattern: DodgePattern, speed: number, difficulty: number): void {
     const th = this.svc.term.theme;
-    const rint = (n: number): number => Math.floor(Math.random() * n);
+    const rint = (n: number): number => Math.floor(this.rand() * n);
     switch (pattern) {
       case "stream": {
         const row = rint(this.rows);
@@ -352,8 +358,8 @@ export class DodgeMode implements GameMode {
       }
       case "diagonal": {
         // A short stream sliding in at 45° from one of the four corners.
-        const fromLeft = Math.random() < 0.5;
-        const fromTop = Math.random() < 0.5;
+        const fromLeft = this.rand() < 0.5;
+        const fromTop = this.rand() < 0.5;
         const sx = fromLeft ? -1 : this.cols + 1;
         const sy = fromTop ? -1 : this.rows + 1;
         const angle = Math.atan2(fromTop ? 1 : -1, fromLeft ? 1 : -1);
@@ -404,7 +410,7 @@ export class DodgeMode implements GameMode {
   // Omnidirectional burst from an interior point — bullets fly out at every angle.
   private spawnRing(ox: number, oy: number, speed: number, difficulty: number): void {
     const count = 8 + Math.floor(difficulty * 8);
-    const offset = Math.random() * Math.PI * 2;
+    const offset = this.rand() * Math.PI * 2;
     const ringSpeed = speed * 0.8;
     for (let i = 0; i < count; i++) {
       const angle = offset + (i / count) * Math.PI * 2;
@@ -444,15 +450,15 @@ export class DodgeMode implements GameMode {
 
   /** A random point just outside one of the four edges. */
   private edgePoint(): { x: number; y: number } {
-    switch (Math.floor(Math.random() * 4)) {
+    switch (Math.floor(this.rand() * 4)) {
       case 0:
-        return { x: -1, y: Math.floor(Math.random() * this.rows) }; // left
+        return { x: -1, y: Math.floor(this.rand() * this.rows) }; // left
       case 1:
-        return { x: this.cols + 1, y: Math.floor(Math.random() * this.rows) }; // right
+        return { x: this.cols + 1, y: Math.floor(this.rand() * this.rows) }; // right
       case 2:
-        return { x: Math.floor(Math.random() * this.cols), y: -1 }; // top
+        return { x: Math.floor(this.rand() * this.cols), y: -1 }; // top
       default:
-        return { x: Math.floor(Math.random() * this.cols), y: this.rows + 1 }; // bottom
+        return { x: Math.floor(this.rand() * this.cols), y: this.rows + 1 }; // bottom
     }
   }
 
@@ -524,7 +530,7 @@ export class DodgeMode implements GameMode {
     this.pickupTimer -= dt;
     if (this.pickupTimer <= 0 && this.pickups.length < 2) {
       this.spawnPickup();
-      this.pickupTimer = 7 + Math.random() * 5;
+      this.pickupTimer = 7 + this.rand() * 5;
     }
     for (let i = this.pickups.length - 1; i >= 0; i--) {
       const pk = this.pickups[i]!;
@@ -538,8 +544,8 @@ export class DodgeMode implements GameMode {
     let x = 0;
     let y = 0;
     for (let tries = 0; tries < 8; tries++) {
-      x = 2 + Math.floor(Math.random() * Math.max(1, this.cols - 4));
-      y = 1 + Math.floor(Math.random() * Math.max(1, this.rows - 2));
+      x = 2 + Math.floor(this.rand() * Math.max(1, this.cols - 4));
+      y = 1 + Math.floor(this.rand() * Math.max(1, this.rows - 2));
       const far = Math.max(Math.abs(x - this.engine.cursor.col), Math.abs(y - this.engine.cursor.row));
       if (far >= 4) break;
     }

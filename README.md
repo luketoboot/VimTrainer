@@ -55,6 +55,19 @@ Drop MP3s at `public/music/menu.mp3` (ambient menu loop) and
 automatically — crossfading between them as you enter/leave runs. No files, no
 music, no errors. Music volume has its own dial in settings.
 
+## Daily Gauntlet
+
+One date-seeded Dodge run per day — the RNG is seeded from the UTC date, so
+every player worldwide faces the exact same waves. One attempt, a global
+leaderboard per day, and a Wordle-style shareable result (`c` on the result
+screen copies it). Come back tomorrow for a new gauntlet.
+
+## Golf replays
+
+After any Golf attempt, press `r` to watch the **par solution** play back
+key-by-key — a key tape shows each keystroke land while the buffer transforms.
+Every shipped solution is proven by tests to solve its puzzle at or under par.
+
 ## Online leaderboards
 
 After a run, press `s` to submit your score under 3-letter arcade initials, or

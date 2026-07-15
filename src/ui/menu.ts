@@ -16,12 +16,14 @@ import { TUTORIAL_CHAPTERS, type TutorialChapter } from "../levels/tutorial.ts";
 import { Storage, type Settings } from "../core/storage.ts";
 import { isLevelUnlocked } from "../core/progression.ts";
 import { getPreset, type InsertEsc, type PresetId } from "../core/keybinds.ts";
+import { todayId } from "../core/daily.ts";
 
 export type ModeKey = "tutorial" | "rush" | "dodge" | "golf";
 
 export type MenuAction =
   | { type: "none" }
   | { type: "settingsChanged" }
+  | { type: "daily" }
   | { type: "start"; mode: "tutorial"; chapter: TutorialChapter }
   | { type: "start"; mode: "rush"; level: CursorRushLevel }
   | { type: "start"; mode: "dodge"; level: DodgeLevel }
@@ -118,7 +120,7 @@ export class MenuScreen {
   }
 
   private handleMode(token: KeyToken): MenuAction {
-    const total = MODES.length + 1; // + settings
+    const total = MODES.length + 2; // + daily + settings
     switch (token) {
       case "j":
       case "<Down>":
@@ -132,7 +134,8 @@ export class MenuScreen {
       case "<Space>":
       case "l":
       case "<Right>":
-        if (this.modeIndex === MODES.length) {
+        if (this.modeIndex === MODES.length) return { type: "daily" };
+        if (this.modeIndex === MODES.length + 1) {
           this.state = "settings";
           this.settingsIndex = 0;
         } else {
@@ -385,8 +388,23 @@ export class MenuScreen {
       term.drawText(row + 1, 6, m.subtitle, { fg: th.dim });
       term.drawText(row, 40, `★ ${stars}/${m.entries.length * 3}`, { fg: th.accentAlt });
     });
-    const setRow = 5 + MODES.length * 3;
-    const setSel = this.modeIndex === MODES.length;
+    // Daily challenge row.
+    const dailyRow = 5 + MODES.length * 3;
+    const dailySel = this.modeIndex === MODES.length;
+    const rec = Storage.getDaily();
+    const playedToday = rec?.date === todayId();
+    term.drawText(dailyRow, 4, `${dailySel ? "▶ " : "  "}DAILY GAUNTLET`, { fg: dailySel ? th.accent : th.fg, bold: dailySel });
+    term.drawText(
+      dailyRow + 1,
+      6,
+      playedToday
+        ? `today: ${rec!.score} pts ${"★".repeat(rec!.stars)} — Enter to view board`
+        : "one attempt — same waves for everyone, global board",
+      { fg: playedToday ? th.accentAlt : th.dim },
+    );
+
+    const setRow = dailyRow + 3;
+    const setSel = this.modeIndex === MODES.length + 1;
     term.drawText(setRow, 4, `${setSel ? "▶ " : "  "}SETTINGS`, { fg: setSel ? th.accent : th.fg, bold: setSel });
 
     term.drawStatusLine(" j/k move   Enter select ", "VimTrainer ");
