@@ -14,7 +14,7 @@ export interface Settings {
 }
 
 export interface SaveData {
-  version: 1;
+  version: number; // bump when a migration is needed (see read())
   settings: Settings;
   highScores: Record<string, number>; // levelId -> best score
   stars: Record<string, number>; // levelId -> 0..3
@@ -24,7 +24,7 @@ export interface SaveData {
 const KEY = "vimtrainer.save.v1";
 
 const DEFAULT: SaveData = {
-  version: 1,
+  version: 2,
   settings: {
     volume: 0.5,
     musicVolume: 0.6,
@@ -45,7 +45,7 @@ function read(): SaveData {
     if (!raw) return structuredCloneSafe(DEFAULT);
     const parsed = JSON.parse(raw) as Partial<SaveData>;
     const base = structuredCloneSafe(DEFAULT); // fresh objects — never share DEFAULT's references
-    return {
+    const data: SaveData = {
       ...base,
       ...parsed,
       settings: {
@@ -55,6 +55,14 @@ function read(): SaveData {
         keybinds: { ...base.settings.keybinds, ...parsed.settings?.keybinds },
       },
     };
+    // v1 -> v2: music defaults ON. v1-era saves could end up with the music
+    // dial stuck at 0 (from debugging silent-audio issues before the autoplay
+    // fix); rescue those once. A deliberate 0 set after v2 is respected.
+    if ((parsed.version ?? 1) < 2 && data.settings.musicVolume === 0) {
+      data.settings.musicVolume = base.settings.musicVolume;
+    }
+    data.version = DEFAULT.version;
+    return data;
   } catch {
     return structuredCloneSafe(DEFAULT);
   }

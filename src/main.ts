@@ -188,12 +188,12 @@ function render(): void {
   else if (screen === "playing" && mode) mode.render();
   else if (screen === "result" && result) renderResult(result);
 
-  // Tiny music state indicator (menu only): ♪ = playing, ♪✕ = not playing.
-  // Makes "why is it silent" diagnosable at a glance.
+  // Tiny music state indicator (menu only): ♪ = playing, ♪0 = muted in
+  // settings, ♪✕ = should play but isn't. Makes silence diagnosable at a glance.
   if (screen === "menu") {
-    const on = music.playing;
-    term.drawText(0, Math.max(0, term.cols - 3), on ? " ♪" : "♪✕", {
-      fg: on ? term.theme.dim : term.theme.danger,
+    const label = music.playing ? " ♪" : settings.musicVolume === 0 ? "♪0" : "♪✕";
+    term.drawText(0, Math.max(0, term.cols - 3), label, {
+      fg: music.playing ? term.theme.dim : term.theme.danger,
     });
   }
 

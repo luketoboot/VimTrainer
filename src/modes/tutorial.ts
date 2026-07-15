@@ -14,6 +14,27 @@ import { contextForEngine, engineWantsEsc, type RemapContext } from "../core/key
 import type { GameMode, GameServices, ModeResult } from "./mode.ts";
 
 /** Run keys on a scratch engine and report the resulting cursor (for reach targets). */
+/** Greedy word-wrap capped at maxLines (last line ellipsized if truncated). */
+function wrapText(text: string, width: number, maxLines: number): string[] {
+  const words = text.split(/\s+/).filter(Boolean);
+  const lines: string[] = [];
+  let cur = "";
+  for (const w of words) {
+    if (cur.length + w.length + 1 > width && cur) {
+      lines.push(cur);
+      cur = w;
+    } else {
+      cur = cur ? `${cur} ${w}` : w;
+    }
+  }
+  if (cur) lines.push(cur);
+  if (lines.length > maxLines) {
+    lines.length = maxLines;
+    lines[maxLines - 1] = lines[maxLines - 1]!.slice(0, width - 1) + "…";
+  }
+  return lines;
+}
+
 export function computeReach(lesson: Lesson): Pos {
   const e = new VimEngine();
   e.load(lesson.buffer, lesson.cursor);
@@ -130,12 +151,15 @@ export class TutorialMode implements GameMode {
     term.clear();
     const l = this.lesson;
 
-    // Instruction + progress + taught-key badge.
+    // Instruction + progress + taught-key badge + real-world use case.
     term.drawText(0, 0, `${this.chapter.title}   (${this.index + 1}/${this.chapter.lessons.length})`, { fg: th.dim });
     term.drawText(1, 0, l.instruction.slice(0, term.cols), { fg: th.fg, bold: true });
     term.drawText(2, 0, `key: [ ${l.teach} ]     try: ${l.idealKeys}`, { fg: th.accentAlt });
+    wrapText(l.why, Math.max(20, term.cols - 2), 2).forEach((line, i) => {
+      term.drawText(3 + i, 0, line, { fg: th.dim });
+    });
 
-    const screenRow = 4;
+    const screenRow = 6;
     const highlights = l.kind === "reach" ? [{ pos: this.reachTarget, bg: th.accent }] : [];
     drawBuffer(term, this.engine.getView(), { screenRow, highlights });
 
